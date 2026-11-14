@@ -87,6 +87,8 @@ For a **loopback-only production-mode trial** without a proxy, set `FORCE_SSL=fa
 
 ### Account administration and health
 
+Signed-in users can open **Settings → Change password**, enter their current password, and enter and confirm a new 12–72 character password (at most 72 bytes). A successful change revokes all of that account’s sessions, including this browser, and returns to sign-in; use the new password on every device. Invalid input leaves the password and sessions unchanged. This form cannot change your email, preferences, health records, or another account. If you have forgotten your password, use the server-side reset command below; there is no email-reset service.
+
 ```sh
 docker compose --env-file .env.production exec app bin/account reset you@example.com
 docker compose --env-file .env.production exec app bin/verify

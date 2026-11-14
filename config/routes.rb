@@ -15,6 +15,7 @@ Rails.application.routes.draw do
   put "journal/:date", to: "journal#update"
   delete "journal/:date", to: "journal#destroy"
   resource :settings, only: [:show, :update]
+  patch "settings/password", to: "settings#change_password", as: :settings_password
   get "settings/export/:kind", to: "settings#export", as: :export
   resources :imports, only: [:create, :show] do
     post :preview, on: :member
