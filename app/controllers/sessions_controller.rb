@@ -8,9 +8,17 @@ class SessionsController < ApplicationController
       flash.now[:alert] = "Too many login attempts. Try again in 15 minutes."
       return render :new, status: :too_many_requests
     end
-    if user = User.authenticate_by(params.permit(:email_address, :password))
+    user = User.authenticate_by(params.permit(:email_address, :password))
+    signed_in = user&.with_lock do
+      # with_lock reloads the digest inside the same database transaction used
+      # by password changes. Never issue a session based on the earlier check.
+      if user.authenticate_password(params[:password])
+        start_new_session_for(user)
+        true
+      end
+    end
+    if signed_in
       LoginAttempt.where(key: key).delete_all
-      start_new_session_for(user)
       redirect_to root_path, status: :see_other
     else
       flash.now[:alert] = "Email or password was not recognized."

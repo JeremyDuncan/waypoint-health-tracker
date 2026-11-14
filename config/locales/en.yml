@@ -28,4 +28,8 @@
 #       enabled: "ON"
 
 en:
+  activerecord:
+    attributes:
+      user:
+        password_challenge: "Current password"
   hello: "Hello world"

@@ -1,5 +1,5 @@
 class SettingsController < ApplicationController
-  before_action :load_backup_status, only: [:show, :update]
+  before_action :load_backup_status, only: [:show, :update, :change_password]
   def show; end
   def update
     attrs = params.require(:user).permit(:preferred_unit, :time_zone, :reminder_local, enabled_metrics: []).to_h
@@ -20,6 +20,26 @@ class SettingsController < ApplicationController
   rescue ArgumentError
     current_user.errors.add(:base, "Reminder date or time zone is invalid")
     render :show, status: :unprocessable_entity
+  end
+  def change_password
+    @password_change = true
+    attrs = params.require(:user).permit(:current_password, :password, :password_confirmation)
+    # Rails checks password_challenge against the persisted digest. Always supply
+    # strings so omitted fields cannot bypass challenge/confirmation validation.
+    changed = current_user.with_lock do
+      current_user.assign_attributes(password_challenge: attrs[:current_password].to_s,
+        password: attrs[:password].to_s, password_confirmation: attrs[:password_confirmation].to_s)
+      if current_user.save(context: :password_change)
+        current_user.sessions.destroy_all
+        true
+      end
+    end
+    if changed
+      terminate_session
+      redirect_to new_session_path, notice: "Password changed. Sign in again on each device.", status: :see_other
+    else
+      render :show, status: :unprocessable_entity
+    end
   end
   def export
     exporter = PersonalExport.new(current_user)

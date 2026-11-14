@@ -8,6 +8,7 @@ class User < ApplicationRecord
   normalizes :email_address, with: ->(e) { e.strip.downcase }
   validates :email_address, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :password, length: { minimum: 12, maximum: 72 }, allow_nil: true
+  validates :password, :password_confirmation, presence: true, on: :password_change
   validates :preferred_unit, inclusion: { in: %w[lb kg] }
   validates :height_cm, numericality: { greater_than: 0, less_than_or_equal_to: 300 }, allow_nil: true
   validate do
