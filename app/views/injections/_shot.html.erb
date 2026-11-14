@@ -1,0 +1,26 @@
+<% shot = row[:injection] %>
+<details class="card shot-card <%= site_class(row[:site]) %>" id="shot-<%= shot.id %>" tabindex="-1" data-shot-status="<%= row[:status] %>">
+  <summary>
+    <span class="shot-number" aria-label="Shot number <%= row[:number] %>"><%= row[:number] %></span>
+    <span class="shot-identity"><strong><%= shot.recorded_at.in_time_zone.strftime('%b %-d, %Y') %></strong><span class="small muted"><%= shot.recorded_at.in_time_zone.strftime('%-I:%M %p %Z') %> · <%= shot.dose.to_s('F') %> mg</span></span>
+    <span class="shot-location"><span class="location-swatch" aria-hidden="true"></span><%= row[:site] %><span class="small muted"><%= row[:side] == 'Not recorded' ? 'Side not recorded' : row[:side] %></span></span>
+    <span class="shot-result <%= change_class(row[:change]) %>"><strong><%= change_label(row[:change]) %></strong><span class="small muted"><%= injection_status(row) %></span></span>
+    <span class="shot-expand" aria-hidden="true">＋</span>
+  </summary>
+  <div class="shot-card-body">
+    <div class="shot-measurements">
+      <div><div class="eyebrow">MEASURED BASELINE</div><% if row[:baseline] %><strong><%= number_with_precision(row[:baseline].in_unit(current_user.preferred_unit), precision: 2, strip_insignificant_zeros: true) %> <%= current_user.preferred_unit %></strong><span class="small muted"><%= local_time_label(row[:baseline].recorded_at) %></span><span class="small muted">Entered: <%= weight_label(row[:baseline]) %></span><% else %><strong>Missing</strong><span class="small muted">No weigh-in within three days before this shot.</span><% end %></div>
+      <div><div class="eyebrow">LATEST MEASURED FOLLOW-UP</div><% if row[:followup] %><strong><%= number_with_precision(row[:followup].in_unit(current_user.preferred_unit), precision: 2, strip_insignificant_zeros: true) %> <%= current_user.preferred_unit %></strong><span class="small muted"><%= local_time_label(row[:followup].recorded_at) %></span><span class="small muted">Entered: <%= weight_label(row[:followup]) %></span><% else %><strong>Missing</strong><span class="small muted">No reading after the shot within its follow-up window.</span><% end %></div>
+    </div>
+    <dl class="shot-facts">
+      <div><dt>Measured change</dt><dd class="<%= change_class(row[:change]) %>"><%= change_label(row[:change]) %><% unless row[:percent].nil? %> · <%= percent_loss_label(row[:percent]) %><% end %></dd></div>
+      <div><dt>Time between weigh-ins</dt><dd><%= row[:span_days] ? "#{number_with_precision(row[:span_days], precision: 2)} days" : 'No paired readings' %></dd></div>
+      <div><dt>Follow-up readings</dt><dd><%= row[:readings].length %></dd></div>
+      <div><dt>Time since previous shot</dt><dd><%= row[:interval_days] ? "#{number_with_precision(row[:interval_days], precision: 2)} days" : 'First logged shot' %></dd></div>
+      <div><dt>Window ends</dt><dd><%= local_time_label(row[:boundary]) %><span class="small muted"> · <%= row[:ended_by_next] ? 'next logged shot' : 'seven days after shot' %></span></dd></div>
+    </dl>
+    <% if row[:status] == :open %><p class="shot-context small muted">This window is still in progress. Its observed change stays out of completed-window comparisons.</p><% elsif row[:status] == :short %><p class="shot-context small muted">These readings are less than 24 hours apart. The measured change is shown here and excluded from group comparisons.</p><% elsif row[:status] == :future %><p class="shot-context small muted">This log has a future timestamp. Check its date and time before interpreting it as a completed shot.</p><% end %>
+    <% if shot.notes.present? %><p class="pre-wrap shot-notes"><%= shot.notes %></p><% end %>
+    <div class="shot-links"><%= link_to "Open this day’s journal →", journal_path(shot.recorded_at.in_time_zone.to_date) %><%= link_to "Edit injection →", edit_entry_path(shot, kind: "injection") %></div>
+  </div>
+</details>

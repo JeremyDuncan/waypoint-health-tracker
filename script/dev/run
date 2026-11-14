@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+
+repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "$repo_dir"
+
+env_file=${DEV_ENV_FILE:-$repo_dir/.env}
+project=${DEV_COMPOSE_PROJECT:-health-tracker-dev}
+if [ ! -f "$env_file" ]; then
+  secret_value=$(openssl rand -hex 64)
+  (
+    umask 077
+    set -C
+    cat > "$env_file" <<EOF
+# Local development only. Production uses .env.production.
+SECRET_KEY_BASE=$secret_value
+APP_HOST=localhost,127.0.0.1
+FORCE_SSL=false
+BIND_ADDRESS=127.0.0.1
+PORT=3000
+EOF
+  )
+  printf '%s\n' "Created development configuration: $env_file"
+fi
+
+docker compose --env-file "$env_file" -f "$repo_dir/compose.dev.yaml" \
+  --project-name "$project" up --detach --build --wait "$@"
+printf '\n%s\n' 'Development is ready. See the published localhost port below:'
+docker compose --env-file "$env_file" -f "$repo_dir/compose.dev.yaml" \
+  --project-name "$project" port app 3000
+printf '%s\n' 'Create your account from the repository root:' \
+  "DEV_ENV_FILE=\"$env_file\" DEV_COMPOSE_PROJECT=\"$project\" ./script/dev/create-account"

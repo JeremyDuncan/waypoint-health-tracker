@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# Run via a stopped service into a fresh volume. Stage on the destination
+# filesystem so read-only backup mounts (including WAL-mode headers) work.
+require_relative "../config/environment"
+require "sqlite3"
+require "tempfile"
+input = ARGV.first
+abort "Usage: bin/restore BACKUP_PATH|- (fresh volume only; app must be stopped)" unless input == "-" || (input && File.file?(input))
+output = ActiveRecord::Base.connection_db_config.database
+abort "Destination already exists. Restore only into a fresh volume; keep the old volume intact." if [output, "#{output}-wal", "#{output}-shm"].any? { |p| File.exist?(p) }
+File.umask(0o077)
+Tempfile.create(["waypoint-health-restore-", ".sqlite3"], File.dirname(output)) do |staged|
+  if input == "-"
+    IO.copy_stream(STDIN, staged)
+  else
+    File.open(input, "rb") { |source| IO.copy_stream(source, staged) }
+  end
+  staged.flush
+  database = SQLite3::Database.new(staged.path)
+  begin
+    abort "Backup failed integrity check" unless database.get_first_value("PRAGMA integrity_check") == "ok"
+    %w[users weights injections day_notes schema_migrations].each { |table| database.get_first_value("SELECT COUNT(*) FROM #{table}") }
+    database.execute("DELETE FROM sessions")
+    # A backup copied to a new server is not evidence of a backup made there.
+    database.execute("DELETE FROM backup_runs") if database.get_first_value("SELECT name FROM sqlite_master WHERE type='table' AND name='backup_runs'")
+    database.execute("PRAGMA journal_mode=DELETE")
+  ensure
+    database.close
+  end
+  staged.fsync
+  # Hard-link creation is atomic and refuses an existing destination.
+  File.link(staged.path, output)
+  File.chmod(0o600, output)
+end
+puts "Backup restored. Sessions revoked. Start the app to migrate and run bin/verify."

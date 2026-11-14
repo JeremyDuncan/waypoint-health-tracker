@@ -1,0 +1,80 @@
+<div data-controller="injection-insights modal chart-preferences" data-modal-open-value="<%= @filter_error || params[:edit_filters] == '1' %>" data-chart-preferences-state-value="<%= @chart_preferences.to_json %>" data-chart-preferences-url-value="<%= chart_preferences_path(page: 'injections') %>" data-action="injection-insights:preferences->chart-preferences#save modal:closed->chart-preferences#restoreFilters" data-injection-insights-payload-value="<%= @insights.chart.to_json %>">
+<section class="page-intro">
+  <div><div class="eyebrow">THE PATTERNS IN YOUR CHECK-INS</div><h1>Injections.</h1><p class="muted">Your shots, your locations, and the weight changes recorded along the way.</p></div>
+  <%= link_to "＋ Log injection", new_entry_path(kind: "injection"), class: "button primary" %>
+</section>
+
+<section class="compact-injection-summary" aria-label="Injection metrics for selected shots">
+  <article class="card compact-injection-stat"><span class="compact-stat-label">Logged shots</span><strong class="compact-shot-count"><%= @insights.rows.length %></strong><span class="compact-change-dates muted"><%= @insights.range.from.strftime('%b %-d') %> – <%= @insights.range.to.strftime('%b %-d, %Y') %></span></article>
+  <article class="card compact-injection-stat compact-change-stat" aria-label="Change across paired readings">
+    <span class="compact-stat-label">Recorded change</span><div class="compact-change-value"><strong class="<%= change_class(@insights.overall_change) %>"><%= change_label(@insights.overall_change) %></strong><% unless @insights.overall_percent.nil? %><span><%= percent_loss_label(@insights.overall_percent) %></span><% end %></div>
+    <span class="compact-change-dates muted"><% if @insights.first_reading %><%= @insights.first_reading.recorded_at.in_time_zone.strftime('%b %-d') %> → <%= @insights.last_reading.recorded_at.in_time_zone.strftime('%b %-d, %Y') %><% else %>No paired readings<% end %></span>
+  </article>
+</section>
+
+<% if @insights.rows.empty? %>
+  <section class="card feature-card"><h2>Weight &amp; injection dates</h2><%= render 'filters_toolbar' %><div class="insights-empty"><h3>A shot is the start of a story.</h3><p class="muted">No injections match these filters. Log an actual injection or choose a wider date range to see your history here.</p><%= link_to "Log injection", new_entry_path(kind: "injection"), class: "button primary" %></div></section>
+<% else %>
+<% if @insights.compared_rows.empty? %><aside class="insights-coverage-notice"><span>Your shot history is here. Completed comparisons need a nearby baseline and follow-up weigh-in.</span><span><%= link_to "Log weight", new_entry_path(kind: "weight") %> · <%= link_to "Import weigh-ins", settings_path %></span></aside><% end %>
+<div class="injection-visuals">
+  <div class="insights-hero-grid">
+    <section class="card location-panel" aria-labelledby="location-heading">
+      <div class="eyebrow">WHERE YOU LOGGED IT</div><h2 id="location-heading">Your location history</h2>
+      <%= render "body_map", insights: @insights %>
+      <div class="location-legend">
+        <% @insights.locations.each do |name, stats| %>
+          <div class="location-legend-item <%= site_class(name) %>"><span class="location-swatch" aria-hidden="true"></span><div><strong><%= name %></strong><span class="small muted"><%= pluralize(stats[:count], 'shot') %><% if stats[:count] > 0 %> · Left <%= stats[:sides]['Left'] %> / Right <%= stats[:sides]['Right'] %><% if stats[:sides]['Not recorded'] > 0 %> · <%= stats[:sides]['Not recorded'] %> without a side<% end %><% end %></span></div></div>
+        <% end %>
+      </div>
+    </section>
+    <section class="card insights-chart-panel injection-history-panel" aria-labelledby="trajectory-heading">
+      <header class="injection-chart-heading"><div class="eyebrow">YOUR WEIGHT AND ACTUAL SHOTS</div><h2 id="trajectory-heading" data-injection-insights-target="timelineTitle">Weight &amp; injection dates</h2></header>
+      <%= render 'filters_toolbar' %>
+      <p class="small muted" data-injection-insights-target="timelineExplanation">Actual weight readings and logged injections on calendar dates.</p>
+      <div class="insights-chart-wrap trajectory-wrap"><canvas data-injection-insights-target="trajectory" role="img" aria-label="Measured weight changes relative to each injection. Exact readings are listed in the shot cards below."></canvas><div class="injection-calendar-markers" data-injection-insights-target="calendarEvents"></div></div>
+      <p class="small muted insights-chart-caption" data-injection-insights-target="trajectoryCaption"></p>
+      <div class="insights-location-key"><span class="site-abdomen"><i></i>Abdomen</span><span class="site-thigh"><i></i>Thigh</span><span class="site-arm"><i></i>Upper arm</span><span class="site-unknown"><i></i>Not recorded</span></div>
+    </section>
+  </div>
+
+  <section class="card insights-chart-panel shot-chart-panel" aria-labelledby="shot-change-heading">
+    <div class="eyebrow">SHOT BY SHOT</div><h2 id="shot-change-heading">Observed change in each window</h2>
+    <p class="small muted">Below zero means a lower follow-up weight. Faint bars are still in progress. Tap a bar to open the measurements behind it.</p>
+    <div class="insights-chart-wrap" data-injection-insights-target="shotWrap"><canvas data-injection-insights-target="shots" role="img" aria-label="Observed weight change for each injection window. Missing pairs have no bar. Exact values are in the shot cards below."></canvas></div>
+    <p class="small muted">Showing the latest <%= [@insights.rows.length,24].min %> selected shots. Missing baseline or follow-up readings stay unmeasured.</p>
+  </section>
+
+  <div class="insights-comparison-grid">
+    <section class="card insights-chart-panel" aria-labelledby="site-comparison-heading">
+      <div class="eyebrow">LOCATION COMPARISON</div><h2 id="site-comparison-heading">Observed change by location</h2>
+      <div class="insights-chart-wrap comparison-wrap" data-injection-insights-target="siteWrap"><canvas data-injection-insights-target="sites" role="img" aria-label="Mean completed-window weight change by location. Comparison counts and measurement spans are listed below."></canvas></div>
+      <%= render "comparison", groups: @insights.site_groups, caption: "Location comparison details" %>
+    </section>
+    <section class="card insights-chart-panel" aria-labelledby="dose-comparison-heading">
+      <div class="eyebrow">DOSE HISTORY</div><h2 id="dose-comparison-heading">Observed change by dose</h2>
+      <div class="insights-chart-wrap comparison-wrap" data-injection-insights-target="doseWrap"><canvas data-injection-insights-target="doses" role="img" aria-label="Mean completed-window weight change by logged dose. Comparison counts and measurement spans are listed below."></canvas></div>
+      <%= render "comparison", groups: @insights.dose_groups, caption: "Dose comparison details" %>
+    </section>
+  </div>
+  <p class="insights-context small muted">These comparisons describe your own logs. Doses, locations, dates and measurement timing vary; small groups can look very different after just one reading.</p>
+</div>
+<% end %>
+
+<details class="card insights-method" id="injection-method">
+  <summary>How these numbers are calculated</summary>
+  <div>
+    <p><strong>Baseline:</strong> the latest actual weigh-in at or before the injection, within the preceding three local days.</p>
+    <p><strong>Follow-up window:</strong> ends at the next actual logged injection or seven local days after this shot, whichever comes first. Location and dose filters never hide a shot that ends an earlier window. Planned reminders are excluded.</p>
+    <p><strong>Observed change:</strong> the latest actual reading after the shot and within that window, minus the baseline, converted to your preferred unit (<%= current_user.preferred_unit %>). The exact reading dates and measurement span appear in each card. Lines connect measured points; no missing reading is estimated.</p>
+    <p><strong>Comparisons:</strong> include only finished windows with a baseline, a follow-up, and at least 24 hours between those readings. In-progress windows and shorter or missing pairs are shown separately in the shot history. Group values are arithmetic means; each compared shot has equal weight.</p>
+    <p><strong>Overall change:</strong> the difference between the earliest baseline and latest follow-up among the paired selected shots. It is an endpoint comparison across those reading dates, not a sum of shot changes. Relative-day graphs include the latest 12 paired shots; the change chart includes the latest 24 selected shots.</p>
+  </div>
+</details>
+
+<section class="shot-history" aria-labelledby="shot-history-heading">
+  <div class="section-heading"><div><div class="eyebrow">THE MEASUREMENTS BEHIND THE PICTURE</div><h2 id="shot-history-heading">Your shot history</h2></div><span class="small muted"><%= pluralize(@insights.rows.length, 'logged shot') %> · <%= current_user.time_zone %></span></div>
+  <% @insights.rows.reverse_each do |row| %><%= render "shot", row: row %><% end %>
+</section>
+
+<%= render 'shared/chart_filter_dialog', page: 'injections' %>
+</div>

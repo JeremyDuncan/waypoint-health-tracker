@@ -1,0 +1,20 @@
+<div class="form-page"><%= link_to "← Back to overview", root_path, class: "back-link" %>
+<section class="card form-card"><div class="eyebrow">A SMALL CHECK-IN</div><h1><%= @entry.persisted? ? "Edit" : "Log" %> <%= @kind %></h1>
+<p class="muted"><%= @kind == "weight" ? "One number. One moment in your story." : "Record the Zepbound injection you actually took." %></p>
+<%= errors_for(@entry) %>
+<%= form_with scope: :entry, url: @entry.persisted? ? entry_path(@entry, kind: @kind) : entries_path(kind: @kind), method: @entry.persisted? ? :patch : :post, class: "stack", data: { controller: "save", action: "submit->save#submit input->save#changed", turbo: false } do |f| %>
+  <%= f.hidden_field :id, value: @entry.uuid %>
+  <% if @kind == "weight" %><div class="weight-input"><div><%= f.label :value, "Weight" %><%= f.number_field :value, value: @entry.value, step: "0.0001", min: "0.0001", max: 1500, required: true, autofocus: true, inputmode: "decimal", placeholder: "0.0" %></div><div><%= f.label :unit, "Unit" %><%= f.select :unit, [["lb", "lb"], ["kg", "kg"]], selected: @entry.unit %></div></div>
+  <% else %>
+    <div class="previous-site"><strong>Previous injection</strong><% if @previous %><p><%= @previous.dose.to_s('F') %> mg · <%= local_time_label(@previous.recorded_at) %><br>Site: <%= [@previous.site, @previous.side].compact_blank.join(' · ').presence || "Not recorded" %></p><% else %><p>No previous injection logged.</p><% end %></div>
+    <div><%= f.label :dose, "Dose (mg)" %><%= f.select :dose, [2.5, 5, 7.5, 10, 12.5, 15].map { |n| ["#{n} mg", n] }, { selected: @entry.dose, include_blank: "Choose dose" }, required: true %></div>
+    <div class="two-columns"><div><%= f.label :site, "Site (optional)" %><%= f.select :site, ["Abdomen", "Thigh", "Upper arm"], selected: @entry.site, include_blank: "Not recorded" %></div><div><%= f.label :side, "Side (optional)" %><%= f.select :side, ["Left", "Right"], selected: @entry.side, include_blank: "Not recorded" %></div></div>
+  <% end %>
+  <div><%= f.label :local_time, @kind == "weight" ? "Weighed at" : "Actually injected at" %><%= f.datetime_local_field :local_time, value: params.dig(:entry, :local_time).presence || (@entry.recorded_at || Time.iso8601(@entry.occurred_at.presence || Time.current.iso8601)).in_time_zone.strftime('%Y-%m-%dT%H:%M'), required: true %><p class="field-hint">Local time in <%= current_user.time_zone %>. Backdating is welcome. <%= link_to "Change time zone", settings_path %></p></div>
+  <details><summary class="small muted">Clock change (only for a repeated local time)</summary><div><%= f.label :utc_offset, "Actual UTC offset" %><%= f.text_field :utc_offset, value: params.dig(:entry, :utc_offset), placeholder: "e.g. -04:00 or -05:00" %><p class="field-hint">Leave blank for normal times. During a fall clock change, select the offset of the actual reading or injection.</p></div></details>
+  <% if @kind == "injection" %><div><%= f.label :notes, "Notes (optional)" %><%= f.text_area :notes, value: @entry.notes, rows: 3, maxlength: 10000 %></div><% end %>
+  <p class="save-status" role="status" aria-live="polite" data-save-target="status">Not saved yet.</p>
+  <%= f.submit "Save #{@kind}", class: "button primary full-width", data: { save_target: "button" } %>
+<% end %>
+<% if @entry.persisted? %><%= button_to "Delete #{@kind}", entry_path(@entry, kind: @kind), method: :delete, class: "danger-link", data: { turbo_confirm: "Delete this #{@kind}? This cannot be undone." } %><% end %>
+</section></div>

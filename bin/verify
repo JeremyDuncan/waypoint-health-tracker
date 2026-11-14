@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+require_relative "../config/environment"
+abort "Integrity check failed" unless ActiveRecord::Base.connection.select_value("PRAGMA integrity_check") == "ok"
+puts({ users: User.count, weights: Weight.count, injections: Injection.count, day_notes: DayNote.count }.to_json)

@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "$repo_dir"
+env_file=${PROD_ENV_FILE:-$repo_dir/.env.production}
+project=${PROD_COMPOSE_PROJECT:-health-tracker}
+
+if [ ! -f "$env_file" ]; then
+  printf '%s\n' "Production configuration is missing: $env_file" \
+    'Configure and start production first with ./script/prod/run.' >&2
+  exit 1
+fi
+
+# Keep the terminal for hidden password prompts; support piped input as well.
+if [ -t 0 ] && [ -t 1 ]; then
+  set --
+else
+  set -- -T
+fi
+exec docker compose --env-file "$env_file" -f "$repo_dir/compose.yaml" \
+  --project-name "$project" exec "$@" app bin/account create

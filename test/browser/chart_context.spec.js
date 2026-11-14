@@ -1,0 +1,127 @@
+const { test, expect } = require('@playwright/test');
+
+test('weekday context, smooth curves, shot labels and goal metrics with an accessible edit modal', async ({ page }, testInfo) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/session/new');
+  await page.getByLabel('Email', { exact: true }).fill(process.env.TEST_EMAIL || 'demo@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(process.env.TEST_PASSWORD || 'synthetic-pass-123');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  for (const [date, value] of [['2026-11-09T08:00', '200'], ['2026-11-10T08:00', '195'], ['2026-11-12T08:00', '190']]) {
+    await page.getByRole('link', { name: '＋ Log weight', exact: true }).click();
+    await page.getByRole('spinbutton', { name: 'Weight', exact: true }).fill(value);
+    await page.getByLabel('Unit', { exact: true }).selectOption('lb');
+    await page.getByLabel('Weighed at').fill(date);
+    await page.getByRole('button', { name: 'Save weight', exact: true }).click();
+  }
+  await page.getByRole('link', { name: '＋ Log injection', exact: true }).click();
+  await page.getByLabel('Dose (mg)', { exact: true }).selectOption('5');
+  await page.getByLabel('Site (optional)').selectOption('Thigh');
+  await page.getByLabel('Side (optional)').selectOption('Left');
+  await page.getByLabel('Actually injected at').fill('2026-11-09T09:30');
+  await page.getByRole('button', { name: 'Save injection', exact: true }).click();
+  await page.goto('/?range=custom&from=2026-11-09&to=2026-11-15&mode=raw&trend=false&weight=true&injections=true&notes=true');
+  const context = await page.locator('[data-controller="timeline"]').evaluate(element => {
+    const canvas = element.querySelector('canvas'), chart = Chart.getChart(canvas);
+    const payload = JSON.parse(element.dataset.timelinePayloadValue);
+    const shot = payload.injections[0], x = chart.scales.x.getPixelForValue(shot.x);
+    const line = chart.getDatasetMeta(0).dataset.interpolate({ x }, 'x');
+    return { ticks: chart.scales.x.ticks.map(tick => tick.label), mode: chart.data.datasets[0].cubicInterpolationMode,
+      markerY: parseFloat(element.querySelector('.injection-on-line').style.top), curveY: line.y,
+      noMedicationWeights: payload.injections.every(event => !('y' in event)) };
+  });
+  expect(context.ticks.some(label => label[0] === 'Mon' && ['Nov 9', '11/9'].includes(label[1]))).toBe(true);
+  expect(context.mode).toBe('monotone');
+  expect(Math.abs(context.markerY - context.curveY)).toBeLessThan(0.1);
+  expect(context.noMedicationWeights).toBe(true);
+  await expect(page.locator('details.range-table')).not.toHaveAttribute('open');
+  await expect(page.locator('article[aria-label="Weight change in selected range"] .range-percent')).toHaveText('5.0% lost');
+  expect(await page.locator('[data-timeline-target="canvas"]').evaluate(canvas => Chart.getChart(canvas).data.datasets[0].fill)).toBe('start');
+  await expect(page.locator('.shot-label-date').first()).toHaveText('Mon, Nov 9');
+  await expect(page.locator('.shot-label-time').first()).toContainText('9:30 AM');
+  await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-weekday-overview.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
+  expect(await page.locator('[data-timeline-target="canvas"]').evaluate(canvas => Chart.getChart(canvas).getDatasetMeta(0).dataset.options.backgroundColor instanceof CanvasGradient)).toBe(true);
+  await page.locator('.timeline-card').screenshot({ path: `test/artifacts/${testInfo.project.name}-overview-gradient-dark.png` });
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Light', exact: true }).click();
+  await page.goto('/review?week=2026-11-09');
+  await expect(page.locator('.plot-weekday')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  await expect(page.locator('.weekly-day')).toHaveCount(7);
+  await expect(page.getByRole('article', { name: 'Monday, Nov 9', exact: true })).toContainText('200 lb');
+  await expect(page.getByRole('article', { name: 'Monday, Nov 9', exact: true })).toContainText('5.0 mg shot');
+  await expect(page.locator('path.plot-line')).toHaveAttribute('d', / C/);
+  await expect(page.locator('path.plot-area')).toHaveAttribute('fill', /^url\(#weight-gradient-/);
+  await expect(page.getByLabel('Weight lost this week', { exact: true })).toContainText('5.0% lost');
+  await expect(page.getByLabel('Weekly average percent weight change', { exact: true })).toBeVisible();
+  await expect(page.locator('.plot-shot-dose').first()).toHaveText('5.0 mg');
+  await expect(page.locator('.plot-shot-site').first()).toHaveText('Thigh · Left');
+  await expect(page.locator('.plot-shot-time').first()).toContainText('Mon 11/9 · 9:30 AM');
+  await expect(page.locator('.weekly-shot-label').first()).toHaveAttribute('href', '/journal/2026-11-09');
+  await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-weekday-review.png`, fullPage: true });
+  await page.getByRole('link', { name: 'Goals', exact: true }).click();
+  const openEditor = page.getByRole('button', { name: /^(Set|Edit) goal$/ });
+  await openEditor.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await page.getByLabel('Goal type').selectOption('target');
+  await page.getByLabel('Goal unit').selectOption('lb');
+  await page.getByLabel('Target weight', { exact: true }).fill('180');
+  await page.getByLabel('Start date', { exact: true }).fill('2026-11-09');
+  await page.getByLabel('Height', { exact: true }).fill('70');
+  await page.getByLabel('Height unit').selectOption('in');
+  await page.getByRole('button', { name: 'Save goal', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByLabel('Current weight', { exact: true })).toContainText('190.0 lb');
+  await expect(page.getByLabel('Current BMI', { exact: true })).toContainText('27.3');
+  await expect(page.getByLabel('Weight change since goal start', { exact: true })).toContainText('10.0 lb');
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
+  await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-goal-metrics.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Edit goal', exact: true }).click();
+  await expect(page.getByLabel('Goal type')).toBeFocused();
+  await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-goal-modal.png`, fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit goal', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Edit goal', exact: true }).click();
+  await page.getByLabel('Height', { exact: true }).fill('500');
+  await page.getByRole('button', { name: 'Save goal', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Height must be a positive number');
+  await expect(page.getByLabel('Height', { exact: true })).toHaveValue('500');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.goto('/injections?mode=calendar');
+  await expect(page.getByRole('combobox', { name: 'Chart view', exact: true })).toHaveValue('calendar');
+  const calendar = await page.locator('[data-injection-insights-target="trajectory"]').evaluate(canvas => {
+    const chart = Chart.getChart(canvas), payload = JSON.parse(canvas.closest('[data-controller~="injection-insights"]').dataset.injectionInsightsPayloadValue);
+    return { points: chart.data.datasets[0].data, expected: payload.history.raw, min: chart.scales.x.min, from: payload.history.from,
+      ticks: chart.scales.x.ticks.map(tick => tick.label), datasets: chart.data.datasets.length };
+  });
+  expect(calendar.points).toEqual(calendar.expected);
+  expect(calendar.min).toBe(calendar.from);
+  expect(calendar.datasets).toBe(1);
+  expect(calendar.ticks.every(label => Array.isArray(label) && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(label[0]))).toBe(true);
+  await expect(page.locator('.injection-calendar-marker').first()).toBeVisible();
+  await page.locator('.injection-calendar-marker').first().click();
+  await expect(page.locator('.shot-card[open]').first()).toBeVisible();
+  await page.locator('.insights-hero-grid').screenshot({ path: `test/artifacts/${testInfo.project.name}-injection-calendar-history.png` });
+  await page.getByRole('combobox', { name: 'Chart view', exact: true }).selectOption('aligned');
+  await expect(page.locator('[data-injection-insights-target="timelineExplanation"]')).toContainText('elapsed days, not calendar weekdays');
+  await page.locator('section[aria-labelledby="trajectory-heading"]').screenshot({ path: `test/artifacts/${testInfo.project.name}-aligned-chart-controls.png` });
+  await expect(page.locator('.injection-calendar-marker')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Chart view', exact: true }).selectOption('calendar');
+  await expect(page.locator('[data-chart-preferences-target="status"]')).toHaveText('Selections saved.');
+  const bars = await page.locator('[data-injection-insights-target="shots"]').evaluate(canvas => {
+    const chart = Chart.getChart(canvas);
+    return { labels: chart.data.labels, plugin: chart.config.plugins.some(plugin => plugin.id === 'shotValueLabels'),
+      lineModes: Object.values(Chart.instances).filter(chart => chart.config.type === 'line').flatMap(chart => chart.data.datasets.map(dataset => dataset.cubicInterpolationMode)) };
+  });
+  expect(bars.labels.some(label => label[1] === 'Thigh · Left')).toBe(true);
+  expect(bars.plugin).toBe(true);
+  expect(bars.lineModes.every(mode => mode === 'monotone')).toBe(true);
+  await page.locator('.shot-chart-panel').screenshot({ path: `test/artifacts/${testInfo.project.name}-shot-bar-labels.png` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  expect(errors).toEqual([]);
+});

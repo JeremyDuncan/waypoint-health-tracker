@@ -1,0 +1,60 @@
+<%= turbo_frame_tag "month-calendar", data: { turbo_action: "advance" } do %>
+  <section class="card month-calendar" aria-labelledby="calendar-heading">
+    <div class="section-heading calendar-heading">
+      <div>
+        <div class="eyebrow">YOUR MONTH AT A GLANCE</div>
+        <h2 id="calendar-heading"><%= calendar.month.strftime("%B %Y") %></h2>
+        <p class="small muted">Your weigh-ins, injections and journal, day by day.</p>
+      </div>
+      <nav class="calendar-navigation" aria-label="Calendar month navigation">
+        <%= link_to "←", calendar_path(month: calendar.month.prev_month.strftime("%Y-%m"), anchor: "month-calendar"), class: "button secondary", aria: { label: "Previous calendar month" } %>
+        <%= link_to "This month", calendar_path(month: calendar.today.strftime("%Y-%m"), anchor: "month-calendar"), class: "button secondary" %>
+        <%= link_to "→", calendar_path(month: calendar.month.next_month.strftime("%Y-%m"), anchor: "month-calendar"), class: "button secondary", aria: { label: "Next calendar month" } %>
+      </nav>
+    </div>
+    <div class="calendar-toolbar">
+      <div class="calendar-totals" aria-label="Entries in this month">
+        <span class="calendar-total calendar-weight"><span aria-hidden="true">●</span> <%= pluralize(calendar.weight_count, "weigh-in") %></span>
+        <span class="calendar-total calendar-injection"><span aria-hidden="true">◆</span> <%= pluralize(calendar.injection_count, "injection") %></span>
+        <span class="calendar-total calendar-journal"><span aria-hidden="true">▤</span> <%= pluralize(calendar.journal_count, "journal day") %></span>
+      </div>
+      <%= form_with url: calendar_path(anchor: "month-calendar"), method: :get, class: "calendar-month-picker" do |f| %>
+        <%= f.label :month, "Jump to month", for: "calendar-month" %>
+        <%= f.month_field :month, id: "calendar-month", value: calendar.month.strftime("%Y-%m"), required: true %>
+        <%= f.submit "Go", class: "button secondary" %>
+      <% end %>
+    </div>
+    <% if calendar.empty? %><p class="calendar-empty muted">No entries this month yet. Choose any day to start its journal.</p><% end %>
+    <table class="month-grid">
+      <caption class="sr-only"><%= calendar.month.strftime("%B %Y") %> activity in <%= current_user.time_zone %>. Each day opens its journal. Counts show actual logged entries.</caption>
+      <thead><tr><% %w[Monday Tuesday Wednesday Thursday Friday Saturday Sunday].each do |weekday| %><th scope="col"><abbr title="<%= weekday %>"><%= weekday.first(3) %></abbr></th><% end %></tr></thead>
+      <tbody>
+        <% calendar.weeks.each do |week| %>
+          <tr>
+            <% week.each do |date| %>
+              <% if calendar.includes?(date) %>
+                <% events = calendar.events_on(date) %>
+                <td>
+                  <%= link_to journal_path(date), class: "calendar-day", aria: { label: calendar.day_label(date), current: date == calendar.today ? "date" : nil }, data: { calendar_date: date.iso8601, turbo_frame: "_top" } do %>
+                    <time class="calendar-day-number" datetime="<%= date.iso8601 %>"><%= date.day %></time>
+                    <span class="calendar-events">
+                      <% if events[:weights] > 0 %><span class="calendar-event calendar-weight"><span aria-hidden="true">●</span> <span class="calendar-event-count"><%= events[:weights] %></span><span class="calendar-event-label"><%= "weigh-in".pluralize(events[:weights]) %></span></span><% end %>
+                      <% if events[:injections] > 0 %><span class="calendar-event calendar-injection"><span aria-hidden="true">◆</span> <span class="calendar-event-count"><%= events[:injections] %></span><span class="calendar-event-label"><%= "injection".pluralize(events[:injections]) %></span></span><% end %>
+                      <% if events[:journal] %>
+                        <span class="calendar-event calendar-journal"><span aria-hidden="true">▤</span> <span class="calendar-event-count">1</span><span class="calendar-event-label">journal</span></span>
+                        <span class="calendar-note-preview"><%= events[:journal].notes.present? ? truncate(events[:journal].notes, length: 55) : "Metrics recorded" %></span>
+                      <% end %>
+                    </span>
+                  <% end %>
+                </td>
+              <% else %>
+                <td class="calendar-padding" aria-hidden="true"></td>
+              <% end %>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <p class="calendar-foot small muted">Select any day to open its journal and entries. Dates use <%= current_user.time_zone %>.</p>
+  </section>
+<% end %>

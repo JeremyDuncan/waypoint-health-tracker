@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Waypoint Health · Personal health</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color" content="#214f40">
+    <meta name="apple-mobile-web-app-title" content="Waypoint Health">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="turbo-cache-control" content="no-cache">
+    <%= csrf_meta_tags %><%= csp_meta_tag %>
+    <link rel="manifest" href="/manifest">
+    <link rel="icon" href="/waypoint-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/waypoint-icon-192.png">
+    <%= javascript_include_tag "theme", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <script src="/vendor/chart.umd.min.js" defer data-turbo-track="reload"></script>
+    <%= javascript_importmap_tags %>
+  </head>
+  <body data-controller="theme" data-action="pointerdown@window->theme#outside keydown@window->theme#keydown turbo:before-visit@document->theme#dismiss">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <%= link_to root_path, class: "brand", aria: { label: "Waypoint Health home" } do %><img class="brand-mark" src="/waypoint-icon.svg" width="36" height="36" alt=""> <span class="brand-name">Waypoint Health</span><% end %>
+      <% if authenticated? %>
+        <nav aria-label="Main navigation">
+          <%= link_to "Overview", root_path, class: controller_name == "dashboard" ? "active" : nil %>
+          <%= link_to "Weekly review", review_path, class: controller_name == "reviews" ? "active" : nil %>
+          <%= link_to "Goals", goal_path, class: controller_name == "goals" ? "active" : nil %>
+          <%= link_to "Injections", injections_path, class: controller_name == "injections" ? "active" : nil %>
+          <%= link_to "Calendar", calendar_path, class: controller_name == "calendars" ? "active" : nil %>
+          <%= link_to "Journal", journal_path(Time.zone.today), class: controller_name == "journal" ? "active" : nil %>
+          <%= link_to "Settings", settings_path, class: %w[settings imports].include?(controller_name) ? "active" : nil %>
+          <%= button_to "Sign out", session_path, method: :delete, class: "text-button" %>
+        </nav>
+      <% end %>
+      <div class="theme-picker">
+        <button type="button" class="theme-icon-button" id="appearance-button" aria-label="Appearance" aria-describedby="appearance-current" aria-haspopup="menu" aria-controls="appearance-menu" aria-expanded="false" title="Appearance" data-theme-target="button" data-action="theme#toggle">
+          <svg data-theme-icon="system" viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 21h8M12 16v5"/></svg>
+          <svg data-theme-icon="light" viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></svg>
+          <svg data-theme-icon="dark" viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M20.5 14A8.8 8.8 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg>
+        </button>
+        <span class="sr-only" id="appearance-current" data-theme-target="current">Current appearance: System</span>
+        <div class="theme-menu" id="appearance-menu" role="menu" aria-labelledby="appearance-button" data-theme-target="menu" hidden>
+          <% { 'system' => 'System', 'light' => 'Light', 'dark' => 'Dark' }.each do |value, label| %><button type="button" role="menuitemradio" aria-checked="<%= value == 'system' %>" tabindex="-1" data-theme-target="choice" data-theme-choice="<%= value %>" data-action="theme#choose"><%= label %><span class="theme-check" aria-hidden="true">✓</span></button><% end %>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="shell">
+      <% flash.each do |type, message| %><div class="flash <%= type %>" role="status"><%= message %></div><% end %>
+      <%= yield %>
+    </main>
+    <footer class="site-footer"><span>Small steps. Your story.</span><span>Private by design · Stored on your server</span></footer>
+  </body>
+</html>

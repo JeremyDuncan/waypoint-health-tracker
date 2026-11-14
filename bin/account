@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+require_relative "../config/environment"
+require "io/console"
+operation, email = ARGV
+abort "Usage: bin/account create [EMAIL] | reset [EMAIL] (password is prompted, never an argument)" unless %w[create reset].include?(operation)
+if email.blank?
+  $stderr.print "Email: "
+  email = STDIN.gets&.strip
+end
+abort "Email is required." if email.blank?
+def read_secret(prompt)
+  $stderr.print prompt
+  value = STDIN.tty? ? STDIN.noecho(&:gets) : STDIN.gets
+  $stderr.puts
+  abort "Password input ended" unless value
+  value.chomp
+end
+password = read_secret("Password (12–72 characters): ")
+confirmation = read_secret("Repeat password: ")
+abort "Passwords do not match" unless password == confirmation
+begin
+User.transaction do
+  user = operation == "create" ? User.new(email_address: email) : User.find_by!(email_address: email.strip.downcase)
+  user.update!(password: password, password_confirmation: confirmation)
+  user.sessions.destroy_all if operation == "reset"
+end
+puts operation == "create" ? "Account created." : "Password reset; all sessions revoked."
+rescue ActiveRecord::RecordInvalid => error
+  abort error.record.errors.full_messages.join("; ")
+rescue ActiveRecord::RecordNotFound
+  abort "Account not found."
+end

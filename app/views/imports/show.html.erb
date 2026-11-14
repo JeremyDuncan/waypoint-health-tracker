@@ -1,0 +1,32 @@
+<%= link_to "← Back to settings", settings_path, class: "back-link" %><section class="page-intro"><div><div class="eyebrow">MOVE MY DATA</div><h1>Review before saving.</h1><p class="muted">Existing entries are never silently overwritten.</p></div></section>
+<% if @renpho %>
+  <section class="card form-card">
+    <div class="eyebrow">RENPHO HEALTH CSV</div>
+    <h2>Renpho export detected</h2>
+    <div class="renpho-details">
+      <p><strong>Date + Time → actual reading time</strong><br>Weight(<%= @batch.payload["weight_unit"] %>) → entered weight in <%= @batch.payload["weight_unit"] %></p>
+      <p class="small muted">Renpho exports local times without UTC offsets. Check the time zone below; daylight-saving offsets are calculated separately for each reading.</p>
+      <p class="small muted">This imports weigh-ins only. Body composition estimates, BMI and Remarks are not imported.</p>
+    </div>
+    <%= form_with url: preview_import_path(@batch), class: "stack" do |f| %>
+      <div><%= f.label :time_zone, "Time zone of these Renpho readings" %><%= f.select :time_zone, TZInfo::Timezone.all_identifiers, selected: @batch.payload["time_zone"] %></div>
+      <%= f.submit "Update Renpho preview", class: "button secondary" %>
+    <% end %>
+  </section>
+<% elsif @headers %>
+  <% defaults = { "date_column" => "occurred_at", "value_column" => "value", "unit_column" => "unit", "id_column" => "id" } %>
+  <section class="card form-card">
+    <h2>Map your weight CSV</h2>
+    <%= form_with url: preview_import_path(@batch), class: "mapping-grid" do |f| %>
+      <% {date_column: "Date/time column", value_column: "Weight column", unit_column: "Unit column (optional)", id_column: "Stable ID column (optional)"}.each do |field, label| %>
+        <div><%= f.label field, label %><%= f.select field, @headers, include_blank: "Choose column", selected: @mapping[field.to_s] || (defaults[field.to_s] if @headers.include?(defaults[field.to_s])) %></div>
+      <% end %>
+      <div><%= f.label :date_format, "Date format" %><%= f.select :date_format, [["ISO timestamp with offset", "iso"], ["YYYY-MM-DD (date only)", "ymd"], ["MM/DD/YYYY (date only)", "mdy"], ["DD/MM/YYYY (date only)", "dmy"]], selected: @mapping["date_format"] %></div>
+      <div><%= f.label :unit, "Unit when no unit column" %><%= f.select :unit, [["Choose explicitly", ""], ["Pounds (lb)", "lb"], ["Kilograms (kg)", "kg"]], selected: @mapping["unit"] %></div>
+      <div><%= f.label :offset, "UTC offset for date-only rows" %><%= f.text_field :offset, value: @mapping["offset"], placeholder: "-05:00" %></div>
+      <p class="small muted">Date-only readings are explicitly assigned local noon with the chosen offset. Split files spanning daylight-saving changes. Numeric dates and missing units are never guessed. Preserve stable IDs to detect edits as conflicts. Renpho Health exports are detected automatically.</p>
+      <%= f.submit "Validate & preview rows", class: "button primary" %>
+    <% end %>
+  </section>
+<% end %>
+<% if @report %><section class="card form-card import-report"><h2>Import preview</h2><div class="import-counts"><span><strong><%= @report['creates'] %></strong> creates</span><span><strong><%= @report['duplicates'] %></strong> duplicates</span><span><strong><%= @report['conflicts'] %></strong> conflicts</span><span><strong><%= @report['errors'].size %></strong> errors</span></div><% @report['errors'].each do |error| %><p class="errors">Row <%= error['row'] %>: <%= error['message'] %></p><% end %><% if @report['conflicts'] > 0 %><p class="errors">Conflicts block the whole import. Keep your edited entry, or reconcile the source file and upload again. Nothing will be overwritten.</p><% end %><div class="table-scroll"><table><thead><tr><th>Row</th><th>Type</th><th>Result</th><th>Source values</th></tr></thead><tbody><% @report['rows'].each do |row| %><tr><td><%= row['row'] %></td><td><%= row['kind'] %></td><td><%= row['status'] %></td><td class="small"><%= row['data'].except('id').to_json %></td></tr><% end %></tbody></table></div><%= form_with url: commit_import_path(@batch), class: "stack" do |f| %><% if @report['preferences'] %><h3>Imported preferences</h3><pre><%= JSON.pretty_generate(@report['preferences']) %></pre><label class="check-label"><%= f.check_box :apply_preferences, checked: true %>Apply these preferences (including time zone, metrics and planned reminder)</label><% end %><%= f.submit @batch.committed_at ? "Already committed" : "Commit import", class: "button primary", disabled: @batch.committed_at.present? || @report['errors'].any? || @report['conflicts'] > 0, data: { turbo_submits_with: "Importing…" } %><% end %></section><% end %>

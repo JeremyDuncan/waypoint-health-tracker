@@ -1,0 +1,24 @@
+<figure class="injection-body-map">
+  <svg viewBox="0 0 320 405" role="img" aria-labelledby="body-map-title body-map-desc">
+    <title id="body-map-title">Logged injection locations, front view</title>
+    <desc id="body-map-desc">Counts show recorded abdomen, thigh and upper-arm injections by your own left and right sides. Unrecorded sites or sides are listed below the diagram.</desc>
+    <g class="body-silhouette">
+      <circle cx="160" cy="37" r="24" />
+      <path d="M142 62 L142 78 Q160 86 178 78 L178 62 M142 78 Q125 77 111 88 L119 135 L127 175 L121 226 Q160 244 199 226 L193 175 L201 135 L209 88 Q195 77 178 78" />
+      <path d="M111 88 Q96 94 92 112 L72 184 Q69 197 77 201 Q86 205 91 192 L116 131 M209 88 Q224 94 228 112 L248 184 Q251 197 243 201 Q234 205 229 192 L204 131" />
+      <path d="M121 226 L119 280 L124 350 Q124 361 136 361 Q146 361 147 350 L160 259 L173 350 Q174 361 184 361 Q196 361 196 350 L201 280 L199 226 M160 259 L160 240" />
+    </g>
+    <line x1="160" y1="90" x2="160" y2="229" class="body-centerline" />
+    <% [["Upper arm","Right",97,126],["Upper arm","Left",223,126],["Abdomen","Right",140,193],["Abdomen","Left",180,193],["Thigh","Right",136,284],["Thigh","Left",184,284]].each do |site, side, x, y| %>
+      <% count = insights.locations.fetch(site)[:sides].fetch(side) %>
+      <g class="body-location <%= site_class(site) %> <%= 'has-shots' if count > 0 %>">
+        <circle cx="<%= x %>" cy="<%= y %>" r="17" />
+        <text x="<%= x %>" y="<%= y + 4 %>" text-anchor="middle"><%= count %></text>
+        <title><%= side %> <%= site.downcase %>: <%= pluralize(count,'logged shot') %></title>
+      </g>
+    <% end %>
+    <text class="body-side-label" x="76" y="390" text-anchor="middle">Your right</text>
+    <text class="body-side-label" x="244" y="390" text-anchor="middle">Your left</text>
+  </svg>
+  <figcaption class="small muted">Front view · counts summarize the body regions you recorded.</figcaption>
+</figure>

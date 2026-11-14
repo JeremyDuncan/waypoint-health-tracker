@@ -1,0 +1,30 @@
+<div data-controller="modal" data-modal-open-value="<%= @goal.errors.any? || current_user.errors.any? %>">
+  <section class="page-intro">
+    <div><div class="eyebrow">YOUR NEXT CHAPTER</div><h1>Goals &amp; milestones.</h1><p class="muted">Your current picture, and the progress since your goal began.</p></div>
+    <button type="button" class="button secondary goal-edit-button" data-action="modal#open" aria-label="<%= current_user.weight_goal ? 'Edit goal' : 'Set goal' %>"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span><%= current_user.weight_goal ? 'Edit goal' : 'Set goal' %></span></button>
+  </section>
+  <section class="injection-summary-grid goal-stats" aria-label="Current goal metrics">
+    <article class="card insight-stat" aria-label="Current weight"><div class="eyebrow">CURRENT WEIGHT</div><div class="stat"><%= @progress.current ? metric_number(@progress.current.in_unit(current_user.preferred_unit)) : '—' %></div><p class="small muted"><%= @progress.current ? local_time_label(@progress.current.recorded_at) : 'No weigh-ins recorded yet' %></p></article>
+    <article class="card insight-stat" aria-label="Current BMI"><div class="eyebrow">CURRENT BMI</div><div class="stat"><%= @progress.bmi ? number_with_precision(@progress.bmi, precision: 1) : '—' %></div><p class="small muted"><% if current_user.height_cm %>Using height <%= number_with_precision(current_user.height_cm, precision: 1) %> cm · kg/m²<% else %><button type="button" class="text-button" data-action="modal#open">Add height for BMI</button><% end %></p></article>
+    <article class="card insight-stat" aria-label="Weight change since goal start"><div class="eyebrow">SINCE GOAL START</div><div class="stat"><%= metric_number(@progress.change&.abs) %></div><p class="small muted"><% if @progress.change %><%= @progress.change.positive? ? 'Gained' : @progress.change.negative? ? 'Lost' : 'No change' %> · <%= number_with_precision(@progress.change_percent.abs, precision: 1) %>% of starting weight<br>From <%= @progress.baseline.local_day %><% else %>Waiting for a goal baseline<% end %></p></article>
+    <article class="card insight-stat"><div class="eyebrow"><%= @progress.maintenance? ? 'MEASURED DAYS IN RANGE' : 'TO YOUR TARGET' %></div><div class="stat"><%= @progress.maintenance? ? "#{@progress.days_in_range} / #{@progress.measured_days}" : metric_number(@progress.remaining) %></div><p class="small muted"><%= @progress.maintenance? ? 'Last reading per measured day' : @progress.config ? "Goal starts #{@progress.config['start_date']}" : 'Set your own target weight' %></p></article>
+  </section>
+  <section class="card feature-card goal-progress">
+    <div class="section-heading"><h2><%= @progress.maintenance? ? 'Your maintenance range' : 'Your weight goal' %></h2><% if @progress.config %><span class="small muted">Started <%= @progress.config['start_date'] %></span><% end %></div>
+    <% if !@progress.config %>
+      <p class="muted">Set a target weight or a maintenance range to start tracking progress.</p><button type="button" class="button primary" data-action="modal#open">Choose a goal</button>
+    <% elsif !@progress.baseline %>
+      <p class="muted">Waiting for your first weigh-in on or after <%= @progress.config['start_date'] %>.</p><%= link_to 'Log weight →', new_entry_path(kind: 'weight') %>
+    <% elsif @progress.maintenance? %>
+      <div class="goal-target"><%= @progress.config['low'] %>–<%= @progress.config['high'] %> <%= @progress.config['unit'] %></div><p>Latest: <strong><%= metric_number(@progress.latest.in_unit(@progress.config['unit']), @progress.config['unit']) %></strong> · <%= @progress.in_range?(@progress.latest) ? 'Within your range' : 'Outside your range' %></p><p class="small muted">Days without a weigh-in stay unmeasured.</p>
+    <% else %>
+      <div class="goal-target"><%= @progress.config['value'] %> <%= @progress.config['unit'] %></div><p>Starting weight <strong><%= metric_number(@progress.baseline.in_unit(@progress.config['unit']), @progress.config['unit']) %></strong> · <%= @progress.baseline.local_day %></p><progress value="<%= @progress.percent %>" max="100" aria-label="Progress toward target weight"><%= @progress.percent.round %>%</progress><p class="small muted"><%= @progress.percent.round %>% of the distance from your baseline to your target</p>
+      <ol class="milestone-list"><% @progress.milestones.each do |milestone| %><li class="<%= 'reached' if milestone[:reached] %>"><span class="milestone-check" aria-hidden="true"><%= milestone[:reached] ? '✓' : '○' %></span><div><strong><%= milestone[:percent] == 100 ? 'Target weight' : "#{milestone[:percent]}% milestone" %> · <%= metric_number(milestone[:value], @progress.config['unit']) %></strong><p class="small muted"><% if milestone[:reached] %>First reached <%= link_to milestone[:reached].local_day, journal_path(milestone[:reached].local_day) %><% else %>Ahead of you<% end %></p></div></li><% end %></ol>
+    <% end %>
+    <p class="small muted">Current weight and BMI use your latest actual reading through now. Goal progress starts with your first reading on or after the goal’s start date. Milestones keep the first observed crossing, even after later changes, and recalculate when the goal or readings change.</p>
+  </section>
+  <dialog class="goal-dialog" data-modal-target="dialog" data-action="close->modal#closed click->modal#backdrop" aria-labelledby="goal-dialog-title">
+    <div class="dialog-heading"><h2 id="goal-dialog-title"><%= @progress.config ? 'Edit your goal' : 'Choose your goal' %></h2><button type="button" class="dialog-close" data-action="modal#close" aria-label="Close goal editor">×</button></div>
+    <%= render 'form' %>
+  </dialog>
+</div>

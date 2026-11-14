@@ -1,0 +1,23 @@
+#!/bin/sh
+# Host-side setup; no Ruby or Node required. Refuse to replace an existing secret.
+set -eu
+host_name=${1:-}
+env_file=${2:-.env}
+case "$host_name" in
+  ''|*[!a-zA-Z0-9.-]*) printf '%s\n' 'Usage: bin/init-env health.example.net [ENV_FILE] (hostname only)' >&2; exit 1 ;;
+esac
+if [ -e "$env_file" ]; then
+  printf '%s\n' "$env_file already exists; edit it directly. Its secret has been preserved." >&2
+  exit 1
+fi
+secret_value=$(openssl rand -hex 64)
+umask 077
+set -C
+cat > "$env_file" <<EOF
+SECRET_KEY_BASE=$secret_value
+APP_HOST=$host_name,localhost
+FORCE_SSL=true
+BIND_ADDRESS=127.0.0.1
+PORT=3000
+EOF
+printf '%s\n' "$env_file created. Keep its secret stable and configure your existing HTTPS proxy."

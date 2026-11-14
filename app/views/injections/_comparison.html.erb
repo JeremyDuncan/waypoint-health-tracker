@@ -1,0 +1,7 @@
+<div class="comparison-details">
+  <table>
+    <caption class="sr-only"><%= caption %></caption>
+    <thead><tr><th scope="col">Group</th><th scope="col">Mean change</th><th scope="col">Compared</th></tr></thead>
+    <tbody><% groups.each do |group| %><tr><th scope="row"><%= group[:label] %><span class="small muted comparison-span"><%= group[:span] ? "#{number_with_precision(group[:span], precision: 1)} days between readings on average" : "No completed measurement pair" %></span></th><td class="<%= change_class(group[:change]) %>"><%= change_label(group[:change]) %></td><td><%= group[:compared] %> / <%= group[:shots] %> shots</td></tr><% end %></tbody>
+  </table>
+</div>

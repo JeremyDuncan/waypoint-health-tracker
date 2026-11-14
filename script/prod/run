@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "$repo_dir"
+
+env_file=${PROD_ENV_FILE:-$repo_dir/.env.production}
+project=${PROD_COMPOSE_PROJECT:-health-tracker}
+if [ ! -f "$env_file" ]; then
+  printf '%s\n' "Production configuration is missing: $env_file" \
+    'Create it once using your real HTTPS hostname:' \
+    "  bin/init-env health.example.net \"$env_file\"" >&2
+  exit 1
+fi
+
+docker compose --env-file "$env_file" -f "$repo_dir/compose.yaml" \
+  --project-name "$project" up --detach --build --wait "$@"
+printf '\n%s\n' 'Production is ready. Point your HTTPS reverse proxy at the published port:'
+docker compose --env-file "$env_file" -f "$repo_dir/compose.yaml" \
+  --project-name "$project" port app 3000
+printf '%s\n' 'Create your account from the repository root:' \
+  "PROD_ENV_FILE=\"$env_file\" PROD_COMPOSE_PROJECT=\"$project\" ./script/prod/create-account"

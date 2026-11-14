@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+# SQLite online backup API: a transactionally consistent snapshot, including WAL.
+require_relative "../config/environment"
+path = ARGV.first
+abort "Usage: bin/backup /data/backup.sqlite3 (choose a new destination)" unless path
+begin
+  counts = ServerBackup.call(path)
+  puts "Consistent backup created. Counts: #{counts.to_json}"
+rescue StandardError => error
+  abort "Backup failed (#{error.class}). Choose a new writable destination and retry."
+end

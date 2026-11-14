@@ -1,0 +1,9 @@
+<section class="page-intro">
+  <div>
+    <div class="eyebrow">YOUR DAILY RECORD</div>
+    <h1>Your month, at a glance.</h1>
+    <p class="muted">Every check-in and every journal entry, in one place.</p>
+  </div>
+  <%= link_to "Open today’s journal →", journal_path(Time.zone.today), class: "button secondary" %>
+</section>
+<div class="calendar-page"><%= render "calendar", calendar: @calendar %></div>

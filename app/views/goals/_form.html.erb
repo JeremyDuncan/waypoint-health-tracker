@@ -1,0 +1,11 @@
+<%= errors_for(@goal) %><%= errors_for(current_user) %>
+<%= form_with model: @goal, scope: :goal, url: goal_path, method: :patch, class: 'stack', data: { controller: 'goal-form' } do |f| %>
+  <div><%= f.label :mode, 'Goal type' %><%= f.select :mode, [['Target weight','target'],['Maintenance range','maintenance']], {}, data: { goal_form_target: 'mode', action: 'goal-form#render' }, autofocus: true %></div>
+  <div><%= f.label :unit, 'Goal unit' %><%= f.select :unit, [['Pounds (lb)','lb'],['Kilograms (kg)','kg']] %></div>
+  <div data-goal-form-target="targetFields"><%= f.label :value, 'Target weight' %><%= f.number_field :value, min: 0.0001, max: 1500, step: 0.0001, inputmode: 'decimal' %></div>
+  <div class="two-columns" data-goal-form-target="maintenanceFields"><div><%= f.label :low, 'Lower weight' %><%= f.number_field :low, min: 0.0001, max: 1500, step: 0.0001, inputmode: 'decimal' %></div><div><%= f.label :high, 'Upper weight' %><%= f.number_field :high, min: 0.0001, max: 1500, step: 0.0001, inputmode: 'decimal' %></div></div>
+  <div><%= f.label :start_date, 'Start date' %><%= f.date_field :start_date, required: true %><p class="field-hint">The first actual weigh-in on or after this local date becomes your baseline.</p></div>
+  <fieldset><legend>Height for BMI (optional)</legend><div class="two-columns"><div><%= label_tag :height_value, 'Height' %><%= number_field_tag :height_value, @height_value, min: 0.1, step: 'any', inputmode: 'decimal' %></div><div><%= label_tag :height_unit, 'Height unit' %><%= select_tag :height_unit, options_for_select([['Centimeters','cm'],['Inches','in']], @height_unit) %></div></div><p class="field-hint">Stored in centimeters. Leave blank to remove height. BMI uses your current weight in kg divided by height in meters squared.</p></fieldset>
+  <div class="dialog-actions"><button type="button" class="button secondary" data-action="modal#close">Cancel</button><%= f.submit 'Save goal', class: 'button primary' %></div>
+<% end %>
+<% if current_user.weight_goal %><%= button_to 'Clear goal', goal_path, method: :delete, class: 'danger-link' %><% end %>

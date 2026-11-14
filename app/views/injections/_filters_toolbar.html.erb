@@ -1,0 +1,16 @@
+<div class="injection-chart-toolbar">
+  <div class="injection-chart-controls <%= 'injection-chart-controls--filters-only' if @insights.rows.empty? %>">
+    <% if @insights.rows.any? %>
+      <label class="injection-view-field" for="injection_chart_view"><span>Chart view</span><%= select_tag :injection_chart_view, options_for_select([['Calendar dates','calendar'],['Compare after each shot','aligned']], @chart_preferences['mode']), disabled: true, data: { injection_insights_target: 'timelineMode', action: 'injection-insights#changeMode' } %></label>
+    <% end %>
+    <button type="button" class="button secondary chart-filter-button" data-action="modal#open" aria-label="Filter injections"><%= render 'shared/filter_icon' %><span>Filters · <%= chart_range_label(@insights.range.range) %></span></button>
+  </div>
+  <div class="active-filter-summary injection-active-filters" aria-label="Active injection filters">
+    <span class="injection-filter-dates"><time datetime="<%= @insights.range.from.iso8601 %>"><%= @insights.range.from.strftime('%b %-d, %Y') %></time><span aria-hidden="true">–</span><time datetime="<%= @insights.range.to.iso8601 %>"><%= @insights.range.to.strftime('%b %-d, %Y') %></time></span>
+    <% if @insights.site != 'all' %><span><%= @insights.site == 'unknown' ? 'Site not recorded' : @insights.site %></span><% end %>
+    <% if @insights.side != 'all' %><span><%= @insights.side == 'unknown' ? 'Side not recorded' : @insights.side %></span><% end %>
+    <% if @insights.dose %><span><%= @insights.dose.to_s('F') %> mg</span><% end %>
+    <% if @insights.grouping == 'site' %><span>Compare by site</span><% end %>
+  </div>
+</div>
+<div class="chart-preference-status injection-filter-status"><span role="status" data-chart-preferences-target="status">Selections are saved to your account.</span><button type="button" class="text-button" data-chart-preferences-target="retry" data-action="chart-preferences#retry" hidden>Retry saving</button></div>
