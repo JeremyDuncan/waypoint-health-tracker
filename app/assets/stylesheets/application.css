@@ -604,3 +604,6 @@ select:not([multiple]) { -webkit-appearance:none; appearance:none; padding-right
   .chart-toolbar { flex-wrap:wrap; }
   .chart-toolbar .chart-filter-button, .chart-toolbar .select-inline { flex:1 1 100%; }
 }
+
+/* Estimated line ends between the nearest readings outside the chart's dates. */
+.plot-estimate { fill:none; stroke:var(--chart-line); stroke-width:2; stroke-dasharray:5 5; stroke-linecap:round; opacity:.7; }

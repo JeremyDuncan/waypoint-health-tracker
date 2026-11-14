@@ -4,16 +4,17 @@
   <svg viewBox="0 0 720 <%= 280 + offset %>" role="img" aria-label="Actual weights connected over the selected dates, with orange guides for actual injection times">
     <% gradient_id = "weight-gradient-#{range.from.strftime('%Y%m%d')}-#{range.to.strftime('%Y%m%d')}" %>
     <defs><linearGradient id="<%= gradient_id %>" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" class="weight-gradient-top"/><stop offset="70%" class="weight-gradient-mid"/><stop offset="100%" class="weight-gradient-bottom"/></linearGradient></defs>
-    <% if plot.points.size >= 2 %><path d="<%= plot_area_path(plot, offset: offset) %>" fill="url(#<%= gradient_id %>)" class="plot-area"/><% end %>
+    <% if plot.area_points.size >= 2 %><path d="<%= plot_area_path(plot, offset: offset) %>" fill="url(#<%= gradient_id %>)" class="plot-area"/><% end %>
     <path d="M40 <%= 50 + offset %>H680 M40 <%= 130 + offset %>H680 M40 <%= 210 + offset %>H680" class="plot-grid"/>
     <% plot.days.each do |day| %>
       <line x1="<%= 40 + day[:boundary] * 640 %>" x2="<%= 40 + day[:boundary] * 640 %>" y1="<%= 40 + offset %>" y2="<%= 220 + offset %>" class="plot-day-guide"/>
       <text x="<%= 40 + day[:x] * 640 %>" y="<%= 242 + offset %>" text-anchor="middle" class="plot-weekday"><%= day[:date].strftime('%a') %></text>
       <text x="<%= 40 + day[:x] * 640 %>" y="<%= 261 + offset %>" text-anchor="middle" class="plot-day-date"><%= day[:date].strftime('%b %-d') %></text>
     <% end %>
-    <% if plot.points.any? %>
+    <% if plot.area_points.any? %>
       <text x="3" y="<%= 54 + offset %>" class="plot-label"><%= number_with_precision(plot.maximum, precision: 1) %></text><text x="3" y="<%= 214 + offset %>" class="plot-label"><%= number_with_precision(plot.minimum, precision: 1) %></text>
       <path d="<%= plot_path(plot, offset: offset) %>" class="plot-line"/>
+      <% if plot.estimate_segments.any? %><path d="<%= plot_estimate_path(plot, offset: offset) %>" class="plot-estimate"><title>Estimated between your nearest readings; not a measurement</title></path><% end %>
       <% plot.points.each do |point| %><a href="<%= journal_path(point[:weight].local_day) %>" aria-label="<%= point[:weight].recorded_at.in_time_zone.strftime('%A, %b %-d · %-I:%M %p') %>: <%= weight_label(point[:weight]) %>. Open day details."><circle cx="<%= 40 + point[:x] * 640 %>" cy="<%= 210 + offset - point[:y] * 160 %>" r="3" class="plot-point"><title><%= local_time_label(point[:weight].recorded_at) %> · <%= weight_label(point[:weight]) %></title></circle></a><% end %>
     <% end %>
     <% plot.injections.each do |point| %><line x1="<%= 40 + point[:x] * 640 %>" x2="<%= 40 + point[:x] * 640 %>" y1="<%= show_shot_labels ? 58 + point[:lane] * 64 : 40 %>" y2="<%= 220 + offset %>" class="plot-shot"><title><%= local_time_label(point[:injection].recorded_at) %> · <%= point[:injection].dose %> mg</title></line><% end %>
@@ -32,5 +33,5 @@
   </svg>
   </div>
   <%= render 'shared/weight_plot_compact', plot: plot, range: range, show_shot_labels: show_shot_labels %>
-  <figcaption class="small muted">Green: actual weigh-ins in <%= current_user.preferred_unit %>. Orange guides<%= ' and dose/location labels' if show_shot_labels %>: actual injections. Curves connect actual readings; missing days have no measurement. Tap a point to open its day.</figcaption>
+  <figcaption class="small muted">Green: actual weigh-ins in <%= current_user.preferred_unit %>. Orange guides<%= ' and dose/location labels' if show_shot_labels %>: actual injections. Curves connect actual readings; missing days have no measurement.<%= " Dashed ends are estimated from your nearest readings before or after these dates; they are not measurements." if plot.estimate_segments.any? %> Tap a point to open its day.</figcaption>
 </figure>

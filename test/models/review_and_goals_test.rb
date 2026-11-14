@@ -56,6 +56,51 @@ class ReviewAndGoalsTest < ActiveSupport::TestCase
     end
   end
 
+  test "weekly chart estimates its edges from the nearest readings outside the week, never past today, across any gap" do
+    weigh = ->(value, at) { @user.weights.create!(value: value, unit: "lb", occurred_at: at) }
+    weigh.(220, "2026-03-02T08:00:00-05:00")   # months before anything else
+    weigh.(202, "2026-11-01T12:00:00-05:00")   # Sunday before the week of Nov 2
+    weigh.(200, "2026-11-03T00:00:00-05:00")
+    weigh.(198, "2026-11-05T00:00:00-05:00")
+    weigh.(196, "2026-11-10T00:00:00-05:00")   # Tuesday after it
+    weigh.(194, "2026-11-24T00:00:00-05:00")
+    Time.use_zone(@user.time_zone) do
+      travel_to Time.iso8601("2026-12-01T12:00:00-05:00") do
+        plot = WeeklyReview.new(@user, "2026-11-02").plot
+        # Monday 00:00 is 12 of the 36 hours between Sunday noon and Tuesday.
+        assert_in_delta 202 - 2.0 * 12 / 36, plot.estimates[:start][:value], 1e-8
+        # Next Monday 00:00 is 4 of the 5 days between Thursday and Tuesday.
+        assert_in_delta 198 - 2.0 * 4 / 5, plot.estimates[:end][:value], 1e-8
+        assert_equal [0.0, 1.0], plot.area_points.values_at(0, -1).map { |point| point[:x] }
+        assert_equal 2, plot.estimate_segments.length
+        assert_equal 2, plot.points.length, "estimates are never added as readings"
+
+        # A week with no readings is bridged by one straight estimate.
+        empty = WeeklyReview.new(@user, "2026-11-16").plot
+        assert_empty empty.points
+        assert_in_delta 196 - 2.0 * 6 / 14, empty.estimates[:start][:value], 1e-8
+        assert_in_delta 196 - 2.0 * 13 / 14, empty.estimates[:end][:value], 1e-8
+        assert_equal 1, empty.estimate_segments.length
+
+        # Weeks inside a months-long gap are bridged from the readings on either side.
+        gap = WeeklyReview.new(@user, "2026-10-05").plot
+        assert_equal %i[start end], gap.estimates.keys
+        assert_equal 1, gap.estimate_segments.length
+        assert gap.estimates[:start][:value].between?(202, 220)
+        assert_operator gap.estimates[:end][:value], :<, gap.estimates[:start][:value]
+        # Before the first reading ever there is nothing to estimate from.
+        assert_empty WeeklyReview.new(@user, "2026-02-02").plot.estimates
+      end
+      # In the current week nothing comes after today, so the line ends at the last reading.
+      travel_to Time.iso8601("2026-11-05T12:00:00-05:00") do
+        current = WeeklyReview.new(@user).plot
+        assert current.estimates.key?(:start)
+        assert_not current.estimates.key?(:end)
+        assert_equal 1, current.estimate_segments.length
+      end
+    end
+  end
+
   test "goal progress retains first observed milestones through regain and ignores future measurements" do
     @user.update!(weight_goal: { mode: "target", value: "180.0", unit: "lb", start_date: "2026-01-01", low: nil, high: nil })
     [["2025-12-31", 220], ["2026-01-01", 200], ["2026-01-08", 190], ["2026-01-15", 185], ["2026-01-20", 195], ["2026-01-30", 160]].each do |day, value|
