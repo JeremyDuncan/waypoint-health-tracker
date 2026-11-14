@@ -35,6 +35,10 @@ class FeaturesTest < ActionDispatch::IntegrationTest
     assert_select '[aria-label="Current BMI"]', text: /28.5/
     assert_select '[aria-label="Weight change since goal start"]', text: /Lost/
     assert_select 'dialog[aria-labelledby="goal-dialog-title"]'
+    # Height is stored in cm but shown back in inches, the default unit.
+    assert_select 'input[name="height_value"][value="70"]'
+    assert_select 'select[name="height_unit"] option[selected][value="in"]'
+    assert_select '[aria-label="Current BMI"]', text: /Using height 70 in/
     patch goal_path, params: { goal: goal.merge(value: "170"), height_value: "-2", height_unit: "cm" }
     assert_response :unprocessable_entity
     assert_equal "180.0", @user.reload.weight_goal["value"]

@@ -25,4 +25,16 @@ class WeightPlot
   end
 
   def injection_lanes = injections.map { |event| event[:lane] + 1 }.max || 0
+
+  # Stacks fixed-width shot labels into rows so none overlap, for a plot area
+  # starting at `left` and `width` units wide.
+  def label_lanes(left:, width:, half:, gap: 4)
+    occupied = []
+    injections.map do |event|
+      x = (left + event[:x] * width).clamp(left + half, left + width - half)
+      lane = occupied.find_index { |right| x - half > right + gap } || occupied.size
+      occupied[lane] = x + half
+      event.merge(label_x: x, lane: lane)
+    end
+  end
 end

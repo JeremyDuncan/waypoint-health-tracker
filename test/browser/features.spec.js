@@ -1,4 +1,10 @@
 const { test, expect } = require('@playwright/test');
+// On narrow screens the main navigation lives behind the menu button.
+async function navigate(page, name) {
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name, exact: true }).click();
+}
 
 test('weekly review, target and maintenance goals, rolling trend, appointment PDF and backup status', async ({ page }, testInfo) => {
   const errors = [];
@@ -33,7 +39,7 @@ test('weekly review, target and maintenance goals, rolling trend, appointment PD
   await expect(page.getByText('Appointment browser note café 🌿', { exact: true })).toBeVisible();
   await expect(page.locator('[aria-label="Weekly summary"]')).toContainText('195.0 lb');
   await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-review.png`, fullPage: true });
-  await page.getByRole('link', { name: 'Goals', exact: true }).click();
+  await navigate(page, 'Goals');
   await page.getByRole('button', { name: /^(Set|Edit) goal$/ }).click();
   await page.getByLabel('Goal type').selectOption('target');
   await page.getByLabel('Goal unit').selectOption('lb');
@@ -84,7 +90,7 @@ test('weekly review, target and maintenance goals, rolling trend, appointment PD
   await download.saveAs(path);
   expect(require('node:fs').readFileSync(path).subarray(0, 5).toString()).toBe('%PDF-');
   await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-report.png`, fullPage: true });
-  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await navigate(page, 'Settings');
   await expect(page.getByLabel('Server backup status', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   expect(errors).toEqual([]);

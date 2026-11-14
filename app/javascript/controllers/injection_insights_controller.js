@@ -113,13 +113,17 @@ export default class extends Controller {
     }))
   }
 
+  // Phones get short dose-only markers so stacked labels don't dwarf the chart.
+  get compact() { return this.trajectoryTarget.parentElement.clientWidth < 500 }
+  get laneSize() { return this.compact ? { half: 27, height: 30 } : { half: 54, height: 62 } }
   calendarLanes(events, toPixel) {
     const occupied = []
+    const { half } = this.laneSize
     return events.map(shot => {
       const x = toPixel(shot)
-      let lane = occupied.findIndex(right => x - 54 > right + 6)
+      let lane = occupied.findIndex(right => x - half > right + 6)
       if (lane < 0) lane = occupied.length
-      occupied[lane] = x + 54
+      occupied[lane] = x + half
       return { shot, x, lane }
     })
   }
@@ -133,11 +137,12 @@ export default class extends Controller {
     this.trajectoryTarget.setAttribute("aria-label", "Weight history on actual calendar dates and weekdays, with labeled dose, location and date markers for actual injections. Exact measurements are available in day journals and shot details.")
     if (this.empty(this.trajectoryTarget, "No weight readings or actual injections in these dates.", data.length > 0 || events.length > 0)) return
     const width = this.trajectoryTarget.parentElement.clientWidth
-    const lanes = this.calendarLanes(events, shot => (shot.x - history.from) / (history.to - history.from) * Math.max(1, width - 180))
+    const compact = this.compact, lane = this.laneSize
+    const lanes = this.calendarLanes(events, shot => (shot.x - history.from) / (history.to - history.from) * Math.max(1, width - (compact ? 60 : 180)))
     const laneCount = Math.max(0, ...lanes.map(event => event.lane + 1))
-    this.trajectoryTarget.parentElement.style.height = `${320 + laneCount * 62}px`
+    this.trajectoryTarget.parentElement.style.height = `${(compact ? 250 : 320) + laneCount * lane.height}px`
     const options = this.options()
-    options.layout = { padding: { top: 18 + laneCount * 62, left: 60, right: 60 } }
+    options.layout = { padding: { top: (compact ? 12 : 18) + laneCount * lane.height, left: compact ? 0 : 60, right: compact ? 14 : 60 } }
     options.parsing = false
     options.scales.x.type = "linear"
     options.scales.x.min = history.from
@@ -154,7 +159,8 @@ export default class extends Controller {
       scale.ticks = history.days.filter((_, index) => index % stride === 0).map(day => ({ value: day.noon }))
     }
     options.scales.x.ticks.autoSkip = !history.days?.length
-    options.scales.y.title = { display: data.length > 0, text: `Actual weight (${this.payloadValue.unit})`, color: this.color("--muted") }
+    options.scales.y.title = { display: data.length > 0 && !compact, text: `Actual weight (${this.payloadValue.unit})`, color: this.color("--muted") }
+    if (compact) { options.scales.y.ticks.maxTicksLimit = 5; options.scales.y.ticks.font.size = 10 }
     options.scales.y.ticks.display = data.length > 0
     options.scales.y.grace = "12%"
     options.plugins.tooltip.callbacks = {
@@ -172,12 +178,12 @@ export default class extends Controller {
       })
       ctx.restore()
     } }
-    const chart = new globalThis.Chart(this.trajectoryTarget, { type: "line", options, plugins: [guides], data: { datasets: [{ data, label: "Actual weight", cubicInterpolationMode: "monotone", tension: 0.35, spanGaps: false, borderColor: this.color("--chart-line"), backgroundColor: context => this.calendarGradient(context.chart), fill: "start", pointBackgroundColor: this.color("--chart-line"), pointRadius: 4, pointHitRadius: 14, pointBorderWidth: 1.5, pointBorderColor: this.color("--card") }] } })
+    const chart = new globalThis.Chart(this.trajectoryTarget, { type: "line", options, plugins: [guides], data: { datasets: [{ data, label: "Actual weight", cubicInterpolationMode: "monotone", tension: 0.35, spanGaps: false, borderColor: this.color("--chart-line"), backgroundColor: context => this.calendarGradient(context.chart), fill: "start", pointBackgroundColor: this.color("--chart-line"), pointRadius: compact && data.length > 40 ? 2.5 : 4, pointHitRadius: 14, pointBorderWidth: 1.5, pointBorderColor: this.color("--card") }] } })
     this.charts.push(chart)
     this.calendarLanes(events, shot => chart.scales.x.getPixelForValue(shot.x)).forEach(({ shot, x, lane }) => {
       const button = document.createElement("button")
-      button.type = "button"; button.className = "injection-calendar-marker"
-      button.style.left = `${x}px`; button.style.top = `${12 + lane * 62}px`; button.style.borderColor = this.siteColor(shot.site)
+      button.type = "button"; button.className = `injection-calendar-marker${compact ? " compact" : ""}`
+      button.style.left = `${x}px`; button.style.top = `${(compact ? 6 : 12) + lane * this.laneSize.height}px`; button.style.borderColor = this.siteColor(shot.site)
       for (const text of [`${shot.dose} mg`, `${shot.site} · ${shot.side}`, new Intl.DateTimeFormat("en-US", { timeZone: this.payloadValue.zone, weekday: "short", month: "short", day: "numeric" }).format(new Date(shot.at))]) { const span = document.createElement("span"); span.textContent = text; button.append(span) }
       button.title = this.date(shot.at); button.setAttribute("aria-label", `${shot.dose} mg · ${shot.site} / ${shot.side} · ${this.date(shot.at)}. Open shot details.`)
       button.addEventListener("click", () => this.openShot(shot.id)); this.calendarEventsTarget.append(button)
@@ -213,26 +219,7 @@ export default class extends Controller {
       }
     }
     options.onClick = (_, elements) => { if (elements.length) this.openShot(data[elements[0].index].id) }
-    const valueLabels = { id: "shotValueLabels", afterDatasetsDraw: chart => {
-      const ctx = chart.ctx, area = chart.chartArea
-      ctx.save(); ctx.font = "600 11px system-ui"; ctx.textBaseline = "middle"
-      data.forEach((shot, index) => {
-        ctx.font = "600 11px system-ui"
-        const bar = chart.getDatasetMeta(0).data[index]
-        const y = chart.scales.y.getPixelForValue(index)
-        const label = shot.change === null ? "No paired readings" : `${Math.abs(shot.change).toFixed(1)} ${this.payloadValue.unit}${shot.change < 0 ? " lost" : shot.change > 0 ? " gained" : " change"}`
-        const percentage = shot.percent === null ? null : this.percentage(shot.percent)
-        const width = Math.max(ctx.measureText(label).width, percentage ? ctx.measureText(percentage).width : 0) + 12
-        const length = shot.change === null ? 0 : Math.abs(bar.x - bar.base)
-        let x = shot.change === null ? area.left + width / 2 + 4 : length >= width ? (bar.x + bar.base) / 2 : bar.x + (shot.change < 0 ? -1 : 1) * (width / 2 + 4)
-        x = Math.max(area.left + width / 2, Math.min(area.right - width / 2, x))
-        ctx.fillStyle = this.color("--card"); ctx.globalAlpha = 0.94
-        ctx.beginPath(); ctx.roundRect(x - width / 2, y - (percentage ? 18 : 11), width, percentage ? 36 : 22, 4); ctx.fill(); ctx.globalAlpha = 1
-        ctx.fillStyle = this.color(shot.change === null ? "--muted" : "--ink"); ctx.textAlign = "center"; ctx.fillText(label, x, y - (percentage ? 6 : 0))
-        if (percentage) { ctx.font = "10px system-ui"; ctx.fillText(percentage, x, y + 8) }
-      })
-      ctx.restore()
-    } }
+    const valueLabels = this.valueLabels("shotValueLabels", data, "No paired readings")
     this.shotsTarget.setAttribute("aria-label", "Observed weight change for each injection, labeled by date, dose, location and side. Each measured bar shows weight lost or gained; missing pairs remain unmeasured. Exact readings are in the shot cards below.")
     this.charts.push(new globalThis.Chart(this.shotsTarget, { type: "bar", options, plugins: [valueLabels],
       data: { labels: data.map(shot => [`#${shot.number} · ${new Intl.DateTimeFormat("en-US", { timeZone: this.payloadValue.zone, month: "short", day: "numeric" }).format(new Date(shot.at))} · ${shot.dose} mg`, `${shot.site} · ${shot.side}`]),
@@ -243,23 +230,49 @@ export default class extends Controller {
   }
 
   renderComparison(canvas, wrapper, groups, sites) {
-    wrapper.style.height = `${Math.max(210, groups.length * 43 + 65)}px`
-    if (this.empty(canvas, "Completed windows with paired weigh-ins at least 24 hours apart are needed for this comparison.", groups.some(group => group.change !== null))) return
+    wrapper.style.height = `${Math.max(210, groups.length * 50 + 65)}px`
+    if (this.empty(canvas, "A shot with a baseline and a follow-up weigh-in at least 24 hours apart is needed for this comparison.", groups.some(group => group.change !== null))) return
     const options = this.options()
     options.indexAxis = "y"
     options.scales.y.grid.display = false
     options.scales.y.ticks.font.size = 10
     options.scales.x.beginAtZero = true
-    options.scales.x.title = { display: true, text: `Mean measured change (${this.payloadValue.unit})`, color: this.color("--muted") }
+    options.scales.x.title = { display: true, text: `Total measured change (${this.payloadValue.unit})`, color: this.color("--muted") }
     options.plugins.tooltip.callbacks = { label: item => {
       const group = groups[item.dataIndex]
-      if (group.change === null) return ["No completed measurement pair", `${group.shots} logged shots`]
-      return [`${this.signed(group.change)} ${this.payloadValue.unit}`, `${group.compared} compared of ${group.shots} logged shots`, `${group.span.toFixed(1)} days between readings on average`]
+      if (group.change === null) return ["No measured shot yet", `${group.shots} logged shots`]
+      return [`Total: ${this.signed(group.change)} ${this.payloadValue.unit} · ${this.percentage(group.percent)}`, `Average per shot: ${this.signed(group.average)} ${this.payloadValue.unit}`, `${group.measured} of ${group.shots} shots measured${group.in_progress ? ` · ${group.in_progress} in progress` : ""}`]
     } }
-    this.charts.push(new globalThis.Chart(canvas, { type: "bar", options,
+    options.scales.x.grace = "8%"
+    const valueLabels = this.valueLabels(`${sites ? "site" : "dose"}ValueLabels`, groups, "No completed pair")
+    this.charts.push(new globalThis.Chart(canvas, { type: "bar", options, plugins: [valueLabels],
       data: { labels: groups.map(group => group.label), datasets: [{ data: groups.map(group => group.change), borderRadius: 4,
         backgroundColor: groups.map(group => (sites ? this.siteColor(group.label.split(" · ")[0]) : this.color("--chart-line")) + "bb") }] }
     }))
+  }
+
+  // Writes "1.2 lb lost" and its percentage on (or beside) each horizontal bar.
+  valueLabels(id, items, emptyLabel) {
+    return { id, afterDatasetsDraw: chart => {
+      const ctx = chart.ctx, area = chart.chartArea
+      ctx.save(); ctx.textBaseline = "middle"
+      items.forEach((item, index) => {
+        ctx.font = "600 11px system-ui"
+        const bar = chart.getDatasetMeta(0).data[index]
+        const y = chart.scales.y.getPixelForValue(index)
+        const label = item.change === null ? emptyLabel : `${Math.abs(item.change).toFixed(1)} ${this.payloadValue.unit}${item.change < 0 ? " lost" : item.change > 0 ? " gained" : " change"}`
+        const percentage = item.change === null || item.percent === null || item.percent === undefined ? null : this.percentage(item.percent)
+        const width = Math.max(ctx.measureText(label).width, percentage ? ctx.measureText(percentage).width : 0) + 12
+        const length = item.change === null ? 0 : Math.abs(bar.x - bar.base)
+        let x = item.change === null ? area.left + width / 2 + 4 : length >= width ? (bar.x + bar.base) / 2 : bar.x + (item.change < 0 ? -1 : 1) * (width / 2 + 4)
+        x = Math.max(area.left + width / 2, Math.min(area.right - width / 2, x))
+        ctx.fillStyle = this.color("--card"); ctx.globalAlpha = 0.94
+        ctx.beginPath(); ctx.roundRect(x - width / 2, y - (percentage ? 18 : 11), width, percentage ? 36 : 22, 4); ctx.fill(); ctx.globalAlpha = 1
+        ctx.fillStyle = this.color(item.change === null ? "--muted" : "--ink"); ctx.textAlign = "center"; ctx.fillText(label, x, y - (percentage ? 6 : 0))
+        if (percentage) { ctx.font = "10px system-ui"; ctx.fillText(percentage, x, y + 8) }
+      })
+      ctx.restore()
+    } }
   }
 
   signed(value) { return `${value > 0 ? "+" : ""}${value.toFixed(2)}` }

@@ -129,12 +129,20 @@ class InjectionInsights
       change: row[:change], percent: row[:percent], status: row[:status], span: row[:span_days] }
   end
 
+  # Totals for a dose or location: every measured shot window is added up,
+  # including one still in progress. Windows run from one shot to the next, so
+  # the sum is the weight change observed while on that dose or site. Very
+  # short (<24 h) or unpaired windows are left out and counted as unmeasured.
   def groups(grouped)
     grouped.map do |label, shots|
-      compared = shots.select { |row| row[:comparable] }
-      { label: label, shots: shots.length, compared: compared.length,
-        change: mean(compared.map { |row| row[:change] }),
-        span: mean(compared.map { |row| row[:span_days] }) }
+      measured = shots.select { |row| %i[complete open].include?(row[:status]) }
+      total = measured.any? ? measured.sum { |row| row[:change] } : nil
+      starting = measured.min_by { |row| row[:baseline].recorded_at }&.dig(:baseline)
+      { label: label, shots: shots.length, measured: measured.length,
+        in_progress: measured.count { |row| row[:status] == :open },
+        change: total, percent: total && total / starting.in_unit(unit) * 100,
+        average: mean(measured.map { |row| row[:change] }),
+        span: mean(measured.map { |row| row[:span_days] }) }
     end
   end
 

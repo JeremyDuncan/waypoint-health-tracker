@@ -1,6 +1,6 @@
 <% show_shot_labels = local_assigns.fetch(:shot_labels, false); offset = show_shot_labels && plot.injection_lanes.positive? ? plot.injection_lanes * 64 - 40 : 0 %>
 <figure class="weight-figure <%= 'weight-figure--days' if plot.days.any? %>">
-  <div class="weight-figure-scroll">
+  <div class="weight-figure-scroll weight-figure-wide">
   <svg viewBox="0 0 720 <%= 280 + offset %>" role="img" aria-label="Actual weights connected over the selected dates, with orange guides for actual injection times">
     <% gradient_id = "weight-gradient-#{range.from.strftime('%Y%m%d')}-#{range.to.strftime('%Y%m%d')}" %>
     <defs><linearGradient id="<%= gradient_id %>" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" class="weight-gradient-top"/><stop offset="70%" class="weight-gradient-mid"/><stop offset="100%" class="weight-gradient-bottom"/></linearGradient></defs>
@@ -31,5 +31,6 @@
     <% if plot.days.empty? %><text x="40" y="<%= 244 + offset %>" class="plot-label"><%= range.from.strftime('%b %-d') %></text><text x="680" y="<%= 244 + offset %>" text-anchor="end" class="plot-label"><%= range.to.strftime('%b %-d, %Y') %></text><% end %>
   </svg>
   </div>
-  <figcaption class="small muted">Green: actual weigh-ins in <%= current_user.preferred_unit %>. Orange guides<%= ' and dose/location labels' if show_shot_labels %>: actual injections. Curves connect actual readings; missing days have no measurement. Tap a point to open its day.<%= ' Swipe the chart to see every day on smaller screens.' if plot.days.any? %></figcaption>
+  <%= render 'shared/weight_plot_compact', plot: plot, range: range, show_shot_labels: show_shot_labels %>
+  <figcaption class="small muted">Green: actual weigh-ins in <%= current_user.preferred_unit %>. Orange guides<%= ' and dose/location labels' if show_shot_labels %>: actual injections. Curves connect actual readings; missing days have no measurement. Tap a point to open its day.</figcaption>
 </figure>

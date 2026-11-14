@@ -1,4 +1,10 @@
 const { test, expect } = require('@playwright/test');
+// On narrow screens the main navigation lives behind the menu button.
+async function navigate(page, name) {
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name, exact: true }).click();
+}
 
 test('weekday context, smooth curves, shot labels and goal metrics with an accessible edit modal', async ({ page }, testInfo) => {
   const errors = [];
@@ -47,20 +53,31 @@ test('weekday context, smooth curves, shot labels and goal metrics with an acces
   await page.getByRole('button', { name: 'Appearance', exact: true }).click();
   await page.getByRole('menuitemradio', { name: 'Light', exact: true }).click();
   await page.goto('/review?week=2026-11-09');
-  await expect(page.locator('.plot-weekday')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  await expect(page.locator('.weight-figure-wide .plot-weekday')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   await expect(page.locator('.weekly-day')).toHaveCount(7);
   await expect(page.getByRole('article', { name: 'Monday, Nov 9', exact: true })).toContainText('200 lb');
   await expect(page.getByRole('article', { name: 'Monday, Nov 9', exact: true })).toContainText('5.0 mg shot');
-  await expect(page.locator('path.plot-line')).toHaveAttribute('d', / C/);
-  await expect(page.locator('path.plot-area')).toHaveAttribute('fill', /^url\(#weight-gradient-/);
+  await expect(page.locator('.weight-figure-wide path.plot-line')).toHaveAttribute('d', / C/);
+  await expect(page.locator('.weight-figure-wide path.plot-area')).toHaveAttribute('fill', /^url\(#weight-gradient-/);
   await expect(page.getByLabel('Weight lost this week', { exact: true })).toContainText('5.0% lost');
   await expect(page.getByLabel('Weekly average percent weight change', { exact: true })).toBeVisible();
-  await expect(page.locator('.plot-shot-dose').first()).toHaveText('5.0 mg');
+  await expect(page.locator('.weight-figure-wide .plot-shot-dose').first()).toHaveText('5.0 mg');
   await expect(page.locator('.plot-shot-site').first()).toHaveText('Thigh · Left');
   await expect(page.locator('.plot-shot-time').first()).toContainText('Mon 11/9 · 9:30 AM');
   await expect(page.locator('.weekly-shot-label').first()).toHaveAttribute('href', '/journal/2026-11-09');
+  // Phones get a readable compact figure instead of a scrolled 720-wide one.
+  const compactFigure = page.locator('.weight-figure-compact');
+  if (testInfo.project.name === 'iphone') {
+    await expect(compactFigure).toBeVisible();
+    await expect(page.locator('.weight-figure-wide')).toBeHidden();
+    await expect(compactFigure.locator('.plot-weekday')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    await expect(compactFigure.locator('.plot-shot-pill').first()).toHaveAttribute('href', '/journal/2026-11-09');
+    expect(await compactFigure.evaluate(element => element.scrollWidth <= element.clientWidth)).toBeTruthy();
+  } else {
+    await expect(compactFigure).toBeHidden();
+  }
   await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-weekday-review.png`, fullPage: true });
-  await page.getByRole('link', { name: 'Goals', exact: true }).click();
+  await navigate(page, 'Goals');
   const openEditor = page.getByRole('button', { name: /^(Set|Edit) goal$/ });
   await openEditor.click();
   const dialog = page.getByRole('dialog');
@@ -69,8 +86,8 @@ test('weekday context, smooth curves, shot labels and goal metrics with an acces
   await page.getByLabel('Goal unit').selectOption('lb');
   await page.getByLabel('Target weight', { exact: true }).fill('180');
   await page.getByLabel('Start date', { exact: true }).fill('2026-11-09');
+  await expect(page.getByLabel('Height unit')).toHaveValue('in');
   await page.getByLabel('Height', { exact: true }).fill('70');
-  await page.getByLabel('Height unit').selectOption('in');
   await page.getByRole('button', { name: 'Save goal', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByLabel('Current weight', { exact: true })).toContainText('190.0 lb');
@@ -81,6 +98,8 @@ test('weekday context, smooth curves, shot labels and goal metrics with an acces
   await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-goal-metrics.png`, fullPage: true });
   await page.getByRole('button', { name: 'Edit goal', exact: true }).click();
   await expect(page.getByLabel('Goal type')).toBeFocused();
+  await expect(page.getByLabel('Height', { exact: true })).toHaveValue('70');
+  await expect(page.getByLabel('Height unit')).toHaveValue('in');
   await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-goal-modal.png`, fullPage: true });
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();

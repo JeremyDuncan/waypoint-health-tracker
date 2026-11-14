@@ -5,7 +5,6 @@ export default class extends Controller {
   static targets = ["canvas", "content", "scroll", "mode", "weightToggle", "trendToggle", "injectionToggle", "noteToggle", "injectionRow", "noteRow", "explanation"]
   static values = { payload: Object }
   connect() {
-    this.zoom = 1
     this.themeChanged = () => this.render()
     window.addEventListener("waypoint-health:theme-change", this.themeChanged)
     this.resizeObserver = new ResizeObserver(() => this.layout())
@@ -19,7 +18,7 @@ export default class extends Controller {
     this.chart?.destroy()
   }
   layout() {
-    const width = Math.max(280, this.scrollTarget.clientWidth) * this.zoom
+    const width = Math.max(280, this.scrollTarget.clientWidth)
     this.contentTarget.style.width = `${width}px`
     this.render()
   }
@@ -39,10 +38,12 @@ export default class extends Controller {
     const trend = p.trend || []
     const hasValues = (this.weightToggleTarget.checked && data.length > 0) || (showTrend && trend.length > 0)
     const showInjections = this.injectionToggleTarget.checked
-    const availableWidth = Math.max(1, this.contentTarget.clientWidth - 180)
+    const compact = this.compact
+    const lane = this.laneSize
+    const availableWidth = Math.max(1, this.contentTarget.clientWidth - (compact ? 60 : 180))
     const lanes = this.injectionLanes(showInjections ? p.injections : [], event => (event.x - p.from) / (p.to - p.from) * availableWidth)
     const laneCount = Math.max(0, ...lanes.map(item => item.lane + 1))
-    this.canvasTarget.parentElement.style.height = `${(this.scrollTarget.clientWidth < 700 ? 240 : 265) + laneCount * 62}px`
+    this.canvasTarget.parentElement.style.height = `${(this.scrollTarget.clientWidth < 700 ? 220 : 265) + laneCount * lane.height}px`
     this.explanationTarget.textContent = {
       raw: "Each point is an actual weigh-in, at its recorded time. Lines connect consecutive weigh-ins; days without a measurement have no point.",
       weekly: "Weekly average = arithmetic mean of all weigh-ins in each Monday–Sunday local week within this range. Points sit at that week’s last actual reading; partial weeks use only selected readings. Lines connect averages; empty weeks have no point.",
@@ -56,7 +57,7 @@ export default class extends Controller {
       data: { datasets: [{ data, label: mode === "raw" ? "Weight" : `${mode === "weekly" ? "Weekly" : "Monthly"} average`, hidden: !this.weightToggleTarget.checked, borderColor: color("--chart-line"), backgroundColor: context => this.weightGradient(context.chart, color("--chart-line")), fill: "start", pointBackgroundColor: color("--chart-line"), borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7, pointHitRadius: 15, pointBorderColor: color("--card"), pointBorderWidth: 2, cubicInterpolationMode: "monotone", tension: 0.35, spanGaps: false }, ...(showTrend ? [{ data: trend, label: "7-day rolling trend", borderColor: color("--injection-ink"), backgroundColor: color("--injection-ink"), borderWidth: 2.5, borderDash: [6, 5], pointRadius: 2, pointHitRadius: 10, cubicInterpolationMode: "monotone", tension: 0.35, spanGaps: false }] : [])] },
       options: {
         animation: false, responsive: true, maintainAspectRatio: false, parsing: false,
-        layout: { padding: { left: hasValues ? 27 : 60, right: 60, top: 20 + laneCount * 62, bottom: 5 } },
+        layout: { padding: { left: hasValues ? (compact ? 4 : 27) : (compact ? 16 : 60), right: compact ? 16 : 60, top: (compact ? 14 : 20) + laneCount * lane.height, bottom: 5 } },
         plugins: { legend: { display: false }, tooltip: { backgroundColor: color("--card"), titleColor: color("--ink"), bodyColor: color("--ink"), borderColor: color("--line"), borderWidth: 1, callbacks: {
           title: items => items.length ? this.readingTime(items[0].raw.x) : "",
           label: item => `${item.dataset.label}: ${item.raw.y.toFixed(2)} ${p.unit}${averaged || item.datasetIndex === 1 ? ` · ${item.raw.count} readings` : ""}`,
@@ -71,7 +72,7 @@ export default class extends Controller {
               scale.ticks = p.days.filter((_, index) => index % stride === 0).map(day => ({ value: day.noon }))
             },
             ticks: { autoSkip: !p.days?.length, maxRotation: 0, maxTicksLimit: this.scrollTarget.clientWidth < 500 ? 4 : 7, color: color("--chart-label"), font: { size: this.scrollTarget.clientWidth < 500 ? 9 : 11 }, callback: value => this.dateLabel(value) } },
-          y: { title: { display: hasValues, text: p.unit, color: color("--chart-label") }, grace: "12%", grid: { color: color("--chart-grid") }, border: { display: false }, ticks: { display: hasValues, color: color("--chart-label"), maxTicksLimit: 5, font: { size: 11 } } }
+          y: { title: { display: hasValues && !compact, text: p.unit, color: color("--chart-label") }, grace: "12%", grid: { color: color("--chart-grid") }, border: { display: false }, ticks: { display: hasValues, color: color("--chart-label"), maxTicksLimit: compact ? 4 : 5, font: { size: compact ? 10 : 11 } } }
         },
         onClick: (_, elements) => { if (elements.length) { const point = elements[0]; this.openDay((point.datasetIndex === 1 ? trend : data)[point.index]?.day) } }
       },
@@ -107,13 +108,17 @@ export default class extends Controller {
     gradient.addColorStop(1, `${color}00`)
     return gradient
   }
+  // Phones get short dose-only pills so stacked labels don't push the chart off screen.
+  get compact() { return this.scrollTarget.clientWidth < 500 }
+  get laneSize() { return this.compact ? { half: 27, height: 30 } : { half: 56, height: 62 } }
   injectionLanes(events, toPixel) {
     const occupied = []
+    const { half } = this.laneSize
     return events.map(event => {
       const x = toPixel(event)
-      let lane = occupied.findIndex(end => x - 56 > end + 6)
+      let lane = occupied.findIndex(end => x - half > end + 6)
       if (lane < 0) lane = occupied.length
-      occupied[lane] = x + 56
+      occupied[lane] = x + half
       return { event, x, lane }
     })
   }
@@ -128,11 +133,12 @@ export default class extends Controller {
     events.forEach(({ event, x, lane }) => {
       const guide = document.createElement("span")
       guide.className = "injection-guide"
-      guide.style.left = `${x}px`; guide.style.top = "20px"; guide.style.height = `${area.bottom - 20}px`
+      const top = this.compact ? 14 : 20
+      guide.style.left = `${x}px`; guide.style.top = `${top}px`; guide.style.height = `${area.bottom - top}px`
       guide.setAttribute("aria-hidden", "true")
       const label = document.createElement("button")
-      label.type = "button"; label.className = "event-marker injection injection-dose"
-      label.style.left = `${x}px`; label.style.top = `${20 + lane * 62}px`
+      label.type = "button"; label.className = `event-marker injection injection-dose${this.compact ? " compact" : ""}`
+      label.style.left = `${x}px`; label.style.top = `${top + lane * this.laneSize.height}px`
       for (const [kind, text] of [["dose", event.label], ["date", new Intl.DateTimeFormat("en-US", { timeZone: this.payloadValue.zone, weekday: "short", month: "short", day: "numeric" }).format(event.x)], ["time", new Intl.DateTimeFormat("en-US", { timeZone: this.payloadValue.zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(event.x)]]) {
         const span = document.createElement("span"); span.className = `shot-label-${kind}`; span.textContent = text; label.append(span)
       }
@@ -193,7 +199,4 @@ export default class extends Controller {
     }
   }
   openDay(day) { if (day) globalThis.Turbo.visit(`/journal/${encodeURIComponent(day)}`) }
-  zoomIn() { this.zoom = Math.min(8, this.zoom * 2); this.layout() }
-  zoomOut() { this.zoom = Math.max(1, this.zoom / 2); this.layout() }
-  reset() { this.zoom = 1; this.scrollTarget.scrollLeft = 0; this.layout() }
 }

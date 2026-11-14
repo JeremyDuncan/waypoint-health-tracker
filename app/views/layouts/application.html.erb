@@ -19,10 +19,10 @@
   </head>
   <body data-controller="theme" data-action="pointerdown@window->theme#outside keydown@window->theme#keydown turbo:before-visit@document->theme#dismiss">
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
+    <header class="site-header" data-controller="nav" data-action="keydown@window->nav#keydown pointerdown@window->nav#outside focusout->nav#focusout">
       <%= link_to root_path, class: "brand", aria: { label: "Waypoint Health home" } do %><img class="brand-mark" src="/waypoint-icon.svg" width="36" height="36" alt=""> <span class="brand-name">Waypoint Health</span><% end %>
       <% if authenticated? %>
-        <nav aria-label="Main navigation">
+        <nav id="site-nav" class="site-nav" aria-label="Main navigation" data-nav-target="panel">
           <%= link_to "Overview", root_path, class: controller_name == "dashboard" ? "active" : nil %>
           <%= link_to "Weekly review", review_path, class: controller_name == "reviews" ? "active" : nil %>
           <%= link_to "Goals", goal_path, class: controller_name == "goals" ? "active" : nil %>
@@ -30,7 +30,7 @@
           <%= link_to "Calendar", calendar_path, class: controller_name == "calendars" ? "active" : nil %>
           <%= link_to "Journal", journal_path(Time.zone.today), class: controller_name == "journal" ? "active" : nil %>
           <%= link_to "Settings", settings_path, class: %w[settings imports].include?(controller_name) ? "active" : nil %>
-          <%= button_to "Sign out", session_path, method: :delete, class: "text-button" %>
+          <%= button_to "Sign out", session_path, method: :delete, class: "text-button", form_class: "sign-out" %>
         </nav>
       <% end %>
       <div class="theme-picker">
@@ -44,6 +44,12 @@
           <% { 'system' => 'System', 'light' => 'Light', 'dark' => 'Dark' }.each do |value, label| %><button type="button" role="menuitemradio" aria-checked="<%= value == 'system' %>" tabindex="-1" data-theme-target="choice" data-theme-choice="<%= value %>" data-action="theme#choose"><%= label %><span class="theme-check" aria-hidden="true">✓</span></button><% end %>
         </div>
       </div>
+      <% if authenticated? %>
+        <button type="button" class="menu-button" aria-label="Menu" aria-controls="site-nav" aria-expanded="false" data-nav-target="button" data-action="nav#toggle">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="menu-line menu-line-top" d="M4 7h16"/><path class="menu-line menu-line-middle" d="M4 12h16"/><path class="menu-line menu-line-bottom" d="M4 17h16"/></svg>
+        </button>
+        <div class="nav-backdrop" data-action="click->nav#close" aria-hidden="true"></div>
+      <% end %>
     </header>
     <main id="main" class="shell">
       <% flash.each do |type, message| %><div class="flash <%= type %>" role="status"><%= message %></div><% end %>

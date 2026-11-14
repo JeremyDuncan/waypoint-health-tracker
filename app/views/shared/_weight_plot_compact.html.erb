@@ -1,0 +1,36 @@
+<%# Phone-sized version of shared/_weight_plot: drawn at roughly 1:1 on a phone so text stays readable without sideways scrolling. Shot labels show the dose only; the site and time are listed beside the chart. %>
+<% left = 34; width = 314; height = 120; pill_half = 21; lane_step = 26
+   shots = show_shot_labels ? plot.label_lanes(left: left, width: width, half: pill_half) : []
+   offset = shots.any? ? shots.map { |shot| shot[:lane] + 1 }.max * lane_step + 4 : 0
+   top = 12 + offset; base = top + height
+   view_height = base + (plot.days.any? ? 40 : 24) %>
+<div class="weight-figure-compact">
+  <svg viewBox="0 0 360 <%= view_height %>" role="img" aria-label="Actual weights connected over the selected dates, with orange guides for actual injection times">
+    <% gradient_id = "weight-gradient-compact-#{range.from.strftime('%Y%m%d')}-#{range.to.strftime('%Y%m%d')}" %>
+    <defs><linearGradient id="<%= gradient_id %>" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" class="weight-gradient-top"/><stop offset="70%" class="weight-gradient-mid"/><stop offset="100%" class="weight-gradient-bottom"/></linearGradient></defs>
+    <% if plot.points.size >= 2 %><path d="<%= plot_area_path(plot, left: left, width: width, base: base, height: height) %>" fill="url(#<%= gradient_id %>)" class="plot-area"/><% end %>
+    <path d="M<%= left %> <%= top %>H<%= left + width %> M<%= left %> <%= top + height / 2 %>H<%= left + width %> M<%= left %> <%= base %>H<%= left + width %>" class="plot-grid"/>
+    <% plot.days.each do |day| %>
+      <line x1="<%= left + day[:boundary] * width %>" x2="<%= left + day[:boundary] * width %>" y1="<%= top - 6 %>" y2="<%= base + 6 %>" class="plot-day-guide"/>
+      <text x="<%= left + day[:x] * width %>" y="<%= base + 20 %>" text-anchor="middle" class="plot-weekday"><%= day[:date].strftime('%a') %></text>
+      <text x="<%= left + day[:x] * width %>" y="<%= base + 34 %>" text-anchor="middle" class="plot-day-date"><%= day[:date].strftime('%-m/%-d') %></text>
+    <% end %>
+    <% if plot.points.any? %>
+      <text x="0" y="<%= top + 4 %>" class="plot-label"><%= number_with_precision(plot.maximum, precision: 1) %></text><text x="0" y="<%= base + 4 %>" class="plot-label"><%= number_with_precision(plot.minimum, precision: 1) %></text>
+      <path d="<%= plot_path(plot, left: left, width: width, base: base, height: height) %>" class="plot-line"/>
+      <% plot.points.each do |point| %><a href="<%= journal_path(point[:weight].local_day) %>" aria-label="<%= point[:weight].recorded_at.in_time_zone.strftime('%A, %b %-d · %-I:%M %p') %>: <%= weight_label(point[:weight]) %>. Open day details."><circle cx="<%= left + point[:x] * width %>" cy="<%= base - point[:y] * height %>" r="<%= plot.points.size > 40 ? 2.5 : 4 %>" class="plot-point"><title><%= local_time_label(point[:weight].recorded_at) %> · <%= weight_label(point[:weight]) %></title></circle></a><% end %>
+    <% end %>
+    <% plot.injections.each do |point| %>
+      <% placed = shots.find { |shot| shot[:injection] == point[:injection] } %>
+      <line x1="<%= left + point[:x] * width %>" x2="<%= left + point[:x] * width %>" y1="<%= placed ? 2 + placed[:lane] * lane_step + 20 : top %>" y2="<%= base %>" class="plot-shot"><title><%= local_time_label(point[:injection].recorded_at) %> · <%= point[:injection].dose %> mg</title></line>
+    <% end %>
+    <% shots.each do |point| %>
+      <% shot = point[:injection]; y = 2 + point[:lane] * lane_step %>
+      <a class="plot-shot-pill" href="<%= journal_path(shot.local_day) %>" aria-label="<%= shot.dose.to_s('F') %> mg · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %> · <%= shot.recorded_at.in_time_zone.strftime('%A, %b %-d at %-I:%M %p %Z') %>. Open day details.">
+        <rect x="<%= point[:label_x] - pill_half %>" y="<%= y %>" width="<%= pill_half * 2 %>" height="20" rx="10" class="plot-shot-label-box"/>
+        <text x="<%= point[:label_x] %>" y="<%= y + 14 %>" text-anchor="middle" class="plot-shot-dose"><%= shot.dose.to_s('F') %> mg</text>
+      </a>
+    <% end %>
+    <% if plot.days.empty? %><text x="<%= left %>" y="<%= base + 18 %>" class="plot-label"><%= range.from.strftime('%b %-d') %></text><text x="<%= left + width %>" y="<%= base + 18 %>" text-anchor="end" class="plot-label"><%= range.to.strftime('%b %-d, %Y') %></text><% end %>
+  </svg>
+</div>

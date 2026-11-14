@@ -1,4 +1,10 @@
 const { test, expect } = require('@playwright/test');
+// On narrow screens the main navigation lives behind the menu button.
+async function navigate(page, name) {
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name, exact: true }).click();
+}
 const email = process.env.TEST_EMAIL || 'demo@example.test';
 const password = process.env.TEST_PASSWORD || 'synthetic-pass-123';
 const login = async page => {
@@ -8,7 +14,7 @@ const login = async page => {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your health, over time.' })).toBeVisible();
 };
-test('quick logging, actual events, weekly mode, journal, filters, zoom and offline retry', async ({ page }, testInfo) => {
+test('quick logging, actual events, weekly mode, journal, filters and offline retry', async ({ page }, testInfo) => {
   const errors = [];
   const externalRequests = [];
   page.on('request', request => { if (new URL(request.url()).origin !== new URL(testInfo.project.use.baseURL || process.env.BASE_URL || 'http://127.0.0.1:3100').origin) externalRequests.push(request.url()); });
@@ -65,8 +71,7 @@ test('quick logging, actual events, weekly mode, journal, filters, zoom and offl
   await page.getByLabel('Injections', { exact: true }).uncheck();
   await expect(page.locator('[data-timeline-target="injectionRow"]')).toBeHidden();
   await page.getByLabel('Injections', { exact: true }).check();
-  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
-  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Zoom in', exact: true })).toHaveCount(0);
   await page.screenshot({ path: `test/artifacts/${testInfo.project.name}-timeline.png`, fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.locator('.event-marker.injection').first().click();
@@ -91,7 +96,7 @@ test('quick logging, actual events, weekly mode, journal, filters, zoom and offl
 });
 test('CSV mapping preview and duplicate-safe commit', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await navigate(page, 'Settings');
   await page.getByLabel('File type').selectOption('csv');
   await page.getByLabel('UTF-8 file').setInputFiles('docs/examples/weights.csv');
   await page.getByRole('button', { name: 'Upload & preview' }).click();

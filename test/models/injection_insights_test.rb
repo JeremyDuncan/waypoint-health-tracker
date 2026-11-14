@@ -41,6 +41,10 @@ class InjectionInsightsTest < ActiveSupport::TestCase
     assert_equal 1, data.locations["Abdomen"][:sides]["Left"]
     assert_equal 1, data.locations["Abdomen"][:sides]["Right"]
     assert_equal ["2.5 mg", "7.5 mg"], data.dose_groups.map { |group| group[:label] }
+    # Group percentages compare the group's total with its first baseline reading.
+    assert_in_delta(-1, data.dose_groups.first[:percent], 0.000001)
+    assert_in_delta(-2.0 / 196 * 100, data.dose_groups.last[:percent], 0.000001)
+    assert_in_delta(-1, data.site_groups.find { |group| group[:label] == "Abdomen · Left" }[:percent], 0.000001)
     # Date filters choose shots; later measured follow-ups remain available.
     one_day = report(from: "2026-01-01", to: "2026-01-01")
     assert_equal 1, one_day.rows.length
@@ -67,6 +71,7 @@ class InjectionInsightsTest < ActiveSupport::TestCase
     assert_equal :no_followup, data.rows.first[:status]
     assert_nil data.rows.first[:change]
     assert_nil data.site_groups.first[:change]
+    assert_nil data.site_groups.first[:percent]
   end
 
   test "ongoing windows show measured changes but stay out of completed comparisons and ignore future readings" do
@@ -82,6 +87,31 @@ class InjectionInsightsTest < ActiveSupport::TestCase
     assert_equal 1, data.open_count
     assert_equal 1, data.rows.first[:readings].length
     assert_equal 1, data.chart[:trajectories].length
+    # Dose and location totals include the in-progress window, marked as such.
+    group = data.dose_groups.sole
+    assert_in_delta(-1, group[:change], 0.000001)
+    assert_equal 1, group[:measured]
+    assert_equal 1, group[:in_progress]
+  end
+
+  test "dose and location groups add up every measured shot, including one in progress" do
+    shot("2026-01-01T09:00:00-05:00", dose: 2.5, site: "Thigh", side: "Right")
+    shot("2026-01-08T09:00:00-05:00", dose: 2.5, site: "Thigh", side: "Left")
+    shot("2026-01-15T09:00:00-05:00", dose: 2.5, site: "Abdomen", side: "Right")
+    weigh("2026-01-01T08:00:00-05:00", 210)
+    weigh("2026-01-08T08:00:00-05:00", 205.4)
+    weigh("2026-01-15T08:00:00-05:00", 203)
+    weigh("2026-01-18T08:00:00-05:00", 200.2)
+    data = report(now: Time.iso8601("2026-01-19T12:00:00-05:00"))
+    assert_equal %i[complete complete open], data.rows.map { |row| row[:status] }
+    group = data.dose_groups.sole
+    assert_equal "2.5 mg", group[:label]
+    assert_in_delta(-9.8, group[:change], 0.000001)
+    assert_in_delta(-9.8 / 210 * 100, group[:percent], 0.000001)
+    assert_in_delta(-9.8 / 3, group[:average], 0.000001)
+    assert_equal [3, 3, 1], group.values_at(:shots, :measured, :in_progress)
+    # Location groups total the same way and together add up to the dose total.
+    assert_in_delta(group[:change], data.site_groups.sum { |site| site[:change] }, 0.000001)
   end
 
   test "completed but very short measurement spans are labeled and excluded from site averages" do
@@ -91,7 +121,7 @@ class InjectionInsightsTest < ActiveSupport::TestCase
     data = report
     assert_equal :short, data.rows.first[:status]
     assert_in_delta(-1, data.rows.first[:change], 0.000001)
-    assert_equal 0, data.site_groups.first[:compared]
+    assert_equal 0, data.site_groups.first[:measured]
     assert_nil data.site_groups.first[:change]
   end
 

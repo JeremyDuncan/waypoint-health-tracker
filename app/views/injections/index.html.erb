@@ -47,12 +47,12 @@
   <div class="insights-comparison-grid">
     <section class="card insights-chart-panel" aria-labelledby="site-comparison-heading">
       <div class="eyebrow">LOCATION COMPARISON</div><h2 id="site-comparison-heading">Observed change by location</h2>
-      <div class="insights-chart-wrap comparison-wrap" data-injection-insights-target="siteWrap"><canvas data-injection-insights-target="sites" role="img" aria-label="Mean completed-window weight change by location. Comparison counts and measurement spans are listed below."></canvas></div>
+      <div class="insights-chart-wrap comparison-wrap" data-injection-insights-target="siteWrap"><canvas data-injection-insights-target="sites" role="img" aria-label="Total measured weight change by location, with the average per shot. Shot counts are listed below."></canvas></div>
       <%= render "comparison", groups: @insights.site_groups, caption: "Location comparison details" %>
     </section>
     <section class="card insights-chart-panel" aria-labelledby="dose-comparison-heading">
       <div class="eyebrow">DOSE HISTORY</div><h2 id="dose-comparison-heading">Observed change by dose</h2>
-      <div class="insights-chart-wrap comparison-wrap" data-injection-insights-target="doseWrap"><canvas data-injection-insights-target="doses" role="img" aria-label="Mean completed-window weight change by logged dose. Comparison counts and measurement spans are listed below."></canvas></div>
+      <div class="insights-chart-wrap comparison-wrap" data-injection-insights-target="doseWrap"><canvas data-injection-insights-target="doses" role="img" aria-label="Total measured weight change while on each logged dose, with the average per shot. Shot counts are listed below."></canvas></div>
       <%= render "comparison", groups: @insights.dose_groups, caption: "Dose comparison details" %>
     </section>
   </div>
@@ -66,7 +66,7 @@
     <p><strong>Baseline:</strong> the latest actual weigh-in at or before the injection, within the preceding three local days.</p>
     <p><strong>Follow-up window:</strong> ends at the next actual logged injection or seven local days after this shot, whichever comes first. Location and dose filters never hide a shot that ends an earlier window. Planned reminders are excluded.</p>
     <p><strong>Observed change:</strong> the latest actual reading after the shot and within that window, minus the baseline, converted to your preferred unit (<%= current_user.preferred_unit %>). The exact reading dates and measurement span appear in each card. Lines connect measured points; no missing reading is estimated.</p>
-    <p><strong>Comparisons:</strong> include only finished windows with a baseline, a follow-up, and at least 24 hours between those readings. In-progress windows and shorter or missing pairs are shown separately in the shot history. Group values are arithmetic means; each compared shot has equal weight.</p>
+    <p><strong>By location and by dose:</strong> each bar is the total of every measured shot window in that group, including a window still in progress, so it shows the weight change observed while on that dose or site. A window needs a baseline, a follow-up, and at least 24 hours between them; shorter or missing pairs are left out and listed in the shot history. The percentage compares that total with the group’s first baseline reading. The average per shot is the total divided by the number of measured shots. Totals for in-progress windows can still change.</p>
     <p><strong>Overall change:</strong> the difference between the earliest baseline and latest follow-up among the paired selected shots. It is an endpoint comparison across those reading dates, not a sum of shot changes. Relative-day graphs include the latest 12 paired shots; the change chart includes the latest 24 selected shots.</p>
   </div>
 </details>
