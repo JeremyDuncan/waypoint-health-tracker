@@ -16,6 +16,7 @@ Rails.application.routes.draw do
   delete "journal/:date", to: "journal#destroy"
   resource :settings, only: [:show, :update]
   patch "settings/password", to: "settings#change_password", as: :settings_password
+  delete "settings/history", to: "settings#clear_history", as: :settings_history
   get "settings/export/:kind", to: "settings#export", as: :export
   resources :imports, only: [:create, :show] do
     post :preview, on: :member

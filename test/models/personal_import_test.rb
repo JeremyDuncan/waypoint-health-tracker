@@ -78,6 +78,30 @@ class PersonalImportTest < ActiveSupport::TestCase
     assert_equal 1, report["creates"]
     assert_equal 1, report["duplicates"]
   end
+  test "entries already saved under another ID are skipped and only new data is imported" do
+    payload = PersonalImport.parse_json(PersonalExport.new(@user).document.to_json)
+    target = create_user("other-ids@example.test")
+    # Same instants as the file, written with a different offset.
+    target.weights.create!(value: "207.80", unit: "lb", occurred_at: "2026-11-02T13:20:00Z")
+    target.injections.create!(dose: 7.5, occurred_at: "2026-11-03T14:30:00Z", site: "Thigh", side: "Left", notes: "Actual injection\nsecond line")
+    target.day_notes.create!(@user.day_notes.first.attributes.slice("local_date", "notes", "metrics"))
+    importer = PersonalImport.new(target, payload)
+    assert_equal [1, 3, 0], importer.report.values_at("creates", "duplicates", "conflicts")
+    assert_difference("Weight.count" => 1, "Injection.count" => 0, "DayNote.count" => 0) do
+      importer.commit!(target.import_batches.create!(payload: payload))
+    end
+    assert_equal 4, importer.report["duplicates"]
+  end
+  test "repeated content with distinct IDs in one file imports once but different readings are kept" do
+    row = { "occurred_at" => "2026-11-05T08:00:00-05:00", "value" => "200.0", "unit" => "lb" }
+    rows = [row, row, row.merge("value" => "201.0"), row.merge("occurred_at" => "2026-11-05T08:00:01-05:00")]
+    payload = { "records" => { "weights" => rows.map { |r| r.merge("id" => SecureRandom.uuid) } } }
+    assert_equal [3, 1, 0], PersonalImport.new(@user, payload).report.values_at("creates", "duplicates", "conflicts")
+    shot = { "id" => SecureRandom.uuid, "occurred_at" => "2026-11-06T08:00:00-05:00", "dose" => "5.0", "site" => "", "side" => nil, "notes" => nil }
+    @user.injections.create!(dose: 5, occurred_at: shot["occurred_at"], site: nil, side: "", notes: "")
+    report = PersonalImport.new(@user, { "records" => { "injections" => [shot] } }).report
+    assert_equal 1, report["duplicates"]
+  end
   test "date only mapping uses explicit format noon and offset" do
     payload = PersonalImport.parse_csv("date,weight\n02/11/2026,94.25\n", { "date_column" => "date", "value_column" => "weight", "unit" => "kg", "date_format" => "dmy", "offset" => "-05:00" })
     assert_empty payload["parse_errors"]

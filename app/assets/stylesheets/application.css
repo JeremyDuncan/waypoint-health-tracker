@@ -338,6 +338,13 @@ html[data-theme-preference="system"] [data-theme-icon="system"],html[data-theme-
 .dialog-close { border:1px solid var(--line); background:var(--surface-muted); color:var(--ink); border-radius:50%; min-width:40px; min-height:40px; font-size:24px; line-height:1; }
 .dialog-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
 .dialog-actions .button { flex:1; }
+.dialog-summary { margin-bottom:20px; }
+.dialog-summary p { margin:0 0 12px; }
+.dialog-summary + .errors { margin-bottom:20px; }
+.danger { background:var(--danger); color:var(--card); }
+.danger:hover { filter:brightness(1.1); }
+.danger-outline { border-color:var(--danger-border); background:var(--card); color:var(--danger); }
+.danger-outline:hover { background:var(--danger-bg); }
 .chart-filter-button { display:inline-flex; align-items:center; gap:9px; white-space:nowrap; }
 .saved-filter-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:15px; margin-bottom:12px; }
 .active-filter-summary { display:flex; flex-wrap:wrap; gap:7px; color:var(--muted); font-size:12px; }
