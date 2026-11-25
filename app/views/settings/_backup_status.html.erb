@@ -2,8 +2,8 @@
   <% if @last_backup %>
     <strong><%= @last_backup.available? ? 'Backup verified when created' : 'Last backup file is missing or changed' %></strong>
     <p class="small">Last successful backup: <%= local_time_label(@last_backup.completed_at) %> · <%= number_to_human_size(@last_backup.byte_size) %></p>
-    <p class="small muted"><%= @last_backup.completed_at < 7.days.ago ? 'This backup is more than 7 days old.' : 'Integrity check passed at creation.' %> <%= @last_backup.available? ? 'The file is present on this server.' : 'An off-host copy may still exist; make a new server backup.' %></p>
-  <% else %><strong>No verified backup recorded yet</strong><p class="small muted">Backups made before this feature are not tracked. Run the command below to record a verified backup.</p><% end %>
+    <p class="small muted"><%= 'More than 7 days old.' if @last_backup.completed_at < 7.days.ago %> <%= 'Make a new backup.' unless @last_backup.available? %></p>
+  <% else %><strong>No verified backup recorded yet</strong><p class="small muted">Run the command below to make one.</p><% end %>
   <% if @backup_attempt&.status == 'failed' %><p class="backup-failure">The latest backup attempt failed at <%= local_time_label(@backup_attempt.completed_at) %>. Retry the command with a new writable destination.</p><% elsif @backup_attempt&.interrupted? %><p class="backup-failure">The latest backup attempt did not finish. Check the host and retry.</p><% elsif @backup_attempt&.status == 'running' %><p class="small">A backup is currently running. Refresh to check its result.</p><% end %>
 </div>
-<p class="small muted">Server-wide status only. Presence and file size are checked here; the full integrity check runs when the backup is created. This does not verify an off-host copy or schedule backups.</p>
+<p class="small muted">Backups aren’t scheduled, and off-server copies aren’t checked.</p>

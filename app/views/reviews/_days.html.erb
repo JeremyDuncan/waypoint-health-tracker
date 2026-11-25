@@ -1,5 +1,5 @@
 <section class="weekly-days-section" aria-labelledby="weekly-days-heading">
-  <div class="section-heading"><h2 id="weekly-days-heading">Your week, day by day</h2><span class="small muted">Every reading keeps its actual time and entered unit.</span></div>
+  <div class="section-heading"><h2 id="weekly-days-heading">Your week, day by day</h2></div>
   <% readings = @review.current.weights.group_by(&:local_day); shots = @review.current.injections.group_by(&:local_day); journals = @review.current.notes.index_by(&:local_date) %>
   <div class="weekly-day-grid">
     <% (@review.from..@review.to).each do |day| %>
@@ -7,7 +7,7 @@
         <%= link_to journal_path(day), class: 'weekly-day-heading' do %><strong><%= day.strftime('%A') %></strong><time datetime="<%= day.iso8601 %>"><%= day.strftime('%b %-d') %></time><% end %>
         <ul><% (readings[day] || []).each do |weight| %><li><strong><%= weight_label(weight) %></strong><span class="small muted"><%= weight.recorded_at.in_time_zone.strftime('%-I:%M %p %Z') %></span></li><% end %></ul>
         <% unless readings[day]&.any? %><p class="small muted"><%= day > Time.zone.today ? 'No readings yet' : 'No weigh-ins' %></p><% end %>
-        <% (shots[day] || []).each do |shot| %><p class="weekly-day-shot"><strong><%= shot.dose.to_s('F') %> mg shot</strong><span><%= shot.recorded_at.in_time_zone.strftime('%-I:%M %p') %> · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %></span></p><% end %>
+        <% (shots[day] || []).each do |shot| %><p class="weekly-day-shot <%= dose_class(shot.dose) %>"><strong><%= shot.dose.to_s('F') %> mg shot</strong><span><%= shot.recorded_at.in_time_zone.strftime('%-I:%M %p') %> · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %></span></p><% end %>
         <% if journals[day] %><%= link_to 'Journal entry →', journal_path(day), class: 'small' %><% end %>
       </article>
     <% end %>

@@ -40,12 +40,18 @@ class ImportsController < ApplicationController
   end
   def commit
     raise ArgumentError, "Preview and validate the file first" unless @batch.payload["records"]
-    PersonalImport.new(current_user, @batch.payload).commit!(@batch, apply_preferences: params[:apply_preferences] == "1")
-    redirect_to settings_path, notice: "Import committed. Repeated files will be recognized as duplicates.", status: :see_other
+    report = PersonalImport.new(current_user, @batch.payload).commit!(@batch, apply_preferences: params[:apply_preferences] == "1")
+    redirect_to settings_path, notice: import_notice(report), status: :see_other
   rescue ArgumentError, ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
     redirect_to import_path(@batch), alert: e.message, status: :see_other
   end
   private
+  def import_notice(report)
+    return "This file was already imported." unless report
+    imported = helpers.pluralize(report["creates"], "new entry", plural: "new entries")
+    skipped = helpers.pluralize(report["duplicates"], "duplicate")
+    "Imported #{imported}. Skipped #{skipped}."
+  end
   def load_batch
     @batch = current_user.import_batches.find(params[:id])
     raise ActiveRecord::RecordNotFound if @batch.expired?

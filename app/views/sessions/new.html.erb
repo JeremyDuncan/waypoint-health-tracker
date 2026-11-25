@@ -1,10 +1,9 @@
 <section class="login card">
-  <div class="eyebrow">YOUR OWN SPACE</div><h1>Welcome home.</h1>
-  <p class="muted">A quieter place to keep track of your health.</p>
+  <h1>Welcome home.</h1>
   <%= form_with url: session_path, class: "stack" do |f| %>
     <div><%= f.label :email_address, "Email" %><%= f.email_field :email_address, required: true, autocomplete: "username", autofocus: true %></div>
     <div><%= f.label :password %><%= f.password_field :password, required: true, autocomplete: "current-password", maxlength: 72 %></div>
     <%= f.submit "Sign in", class: "button primary" %>
   <% end %>
-  <p class="small muted">Accounts and password resets are managed on your server. No email service is required.</p>
+  <p class="small muted">Accounts and passwords are managed on your server.</p>
 </section>

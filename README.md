@@ -13,6 +13,7 @@ It runs in a single Docker container on your own server. No cloud services, no t
 - **Goals:** a target weight or a range to maintain, plus BMI if you add your height.
 - **Appointment report:** a PDF to bring to your doctor.
 - **Import/export:** download all your data, or import it (including Renpho scale exports).
+- **Clear history:** permanently delete all your entries from Settings, after typing a confirmation.
 
 ## Run it on your computer
 

@@ -1,0 +1,1 @@
+<% if doses.any? %><div class="dose-key" aria-label="Dose colors"><% doses.uniq.sort.each do |dose| %><span><%= dose_dot(dose) %><%= dose.to_s("F").delete_suffix(".0") %> mg</span><% end %></div><% end %>

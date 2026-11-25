@@ -2,6 +2,7 @@ Rails.application.routes.draw do
   resource :session, only: [:new, :create, :destroy]
   root "dashboard#index"
   get "calendar", to: "calendars#show", as: :calendar
+  get "calendar/:date", to: "calendars#day", as: :calendar_day, constraints: { date: /\d{4}-\d{2}-\d{2}/ }
   resources :injections, only: :index
   resource :chart_preferences, only: [:update, :destroy], path: "charts/:page/preferences"
   resource :review, only: :show
@@ -16,6 +17,7 @@ Rails.application.routes.draw do
   delete "journal/:date", to: "journal#destroy"
   resource :settings, only: [:show, :update]
   patch "settings/password", to: "settings#change_password", as: :settings_password
+  delete "settings/history", to: "settings#clear_history", as: :settings_history
   get "settings/export/:kind", to: "settings#export", as: :export
   resources :imports, only: [:create, :show] do
     post :preview, on: :member

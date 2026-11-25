@@ -65,7 +65,7 @@ test('weekly review, target and maintenance goals, rolling trend, appointment PD
   await page.getByLabel('7-day trend', { exact: true }).check();
   for (const mode of ['raw', 'weekly', 'monthly']) {
     await page.getByRole('combobox', { name: 'View', exact: true }).selectOption(mode);
-    await expect(page.locator('[data-timeline-target="explanation"]')).toContainText('preceding 168 hours');
+    await expect(page.locator('[data-timeline-target="explanation"]')).toContainText('average of the last 7 days');
     const series = await page.locator('[data-controller="timeline"]').evaluate(element => {
       const chart = Chart.getChart(element.querySelector('canvas'));
       return { actual: chart.data.datasets[1].data, expected: JSON.parse(element.dataset.timelinePayloadValue).trend };

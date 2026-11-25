@@ -56,10 +56,11 @@ class PersonalImport
     @user, @payload = user, payload
   end
   def report
-    seen = {}; seen_days = {}
+    seen = {}; seen_days = {}; seen_content = {}
     result = { "rows" => [], "errors" => (@payload["parse_errors"] || []).dup,
       "creates" => 0, "duplicates" => 0, "conflicts" => 0 }
     KINDS.each do |kind, klass|
+      existing_content = @user.public_send(kind).to_a.to_h { |saved| [content_key(saved), true] }
       Array(@payload.dig("records", kind)).each_with_index do |raw, index|
         row_number = raw.is_a?(Hash) ? (raw["_row"] || index + 1) : index + 1
         unless raw.is_a?(Hash) && raw["id"].is_a?(String) && (raw.keys - ["_row"]).sort == PersonalExport::FIELDS[kind].sort
@@ -80,17 +81,23 @@ class PersonalImport
         existing = @user.public_send(kind).find_by(uuid: record.uuid)
         existing ||= @user.day_notes.find_by(local_date: record.local_date) if kind == "day_notes"
         canonical = record.portable
+        content = content_key(record)
         previous = seen[[kind, record.uuid]]
         previous ||= seen_days[record.local_date] if kind == "day_notes"
         status = if existing
-          existing.portable == canonical ? "duplicates" : "conflicts"
+          content_key(existing) == content ? "duplicates" : "conflicts"
         elsif previous
-          previous == canonical ? "duplicates" : "conflicts"
+          previous == content ? "duplicates" : "conflicts"
+        elsif existing_content[content] || seen_content[[kind, content]]
+          # The same event saved under another ID, such as a manually logged
+          # entry that was also restored from a file.
+          "duplicates"
         else
           "creates"
         end
-        seen[[kind, record.uuid]] = canonical
-        seen_days[record.local_date] = canonical if kind == "day_notes"
+        seen_content[[kind, content]] = true if status == "creates"
+        seen[[kind, record.uuid]] = content
+        seen_days[record.local_date] = content if kind == "day_notes"
         result[status] += 1
         result["rows"] << { "row" => row_number, "kind" => kind, "status" => status, "data" => canonical }
       end
@@ -116,6 +123,15 @@ class PersonalImport
   rescue ActiveRecord::SerializationTypeMismatch, ActiveModel::UnknownAttributeError, TypeError => e
     { "rows" => [], "errors" => [{ "row" => "file", "message" => "Invalid record structure" }], "creates" => 0, "duplicates" => 0, "conflicts" => 0 }
   end
+  # Identifies the entry itself, independent of its ID and of how its timestamp
+  # or blank optional fields happen to be written.
+  def content_key(record)
+    case record
+    when Weight then [record.recorded_at, record.value, record.unit]
+    when Injection then [record.recorded_at, record.dose, record.site.presence, record.side.presence, record.notes.presence]
+    when DayNote then [record.local_date, record.notes.presence, record.metrics]
+    end
+  end
   def valid_reminder?(value)
     Date.iso8601(value[0, 10])
     Time.iso8601(value)
@@ -132,6 +148,7 @@ class PersonalImport
       @payload = batch.payload
       preview = report
       raise ArgumentError, "Resolve validation errors and conflicts before committing. Existing records are never overwritten." if preview["errors"].any? || preview["conflicts"] > 0
+      # Only new rows are written; duplicates are skipped.
       preview["rows"].select { |row| row["status"] == "creates" }.each do |row|
         attrs = row["data"].dup
         attrs["uuid"] = attrs.delete("id")
@@ -139,6 +156,7 @@ class PersonalImport
       end
       @user.update!(preview["preferences"]) if apply_preferences && preview["preferences"]
       batch.update!(committed_at: Time.current)
+      preview
     end
   end
 end

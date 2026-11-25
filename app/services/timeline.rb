@@ -29,7 +29,7 @@ class Timeline
     { from: from.in_time_zone.to_f * 1000, to: (to + 1).in_time_zone.to_f * 1000 - 1,
       zone: @user.time_zone, unit: @user.preferred_unit, raw: raw, weekly: weekly, monthly: monthly, trend: rolling_trend,
       days: (to - from).to_i < 31 ? (from..to).map { |day| { day: day.iso8601, start: day.in_time_zone.to_f * 1000, finish: (day + 1).in_time_zone.to_f * 1000, noon: day.in_time_zone.change(hour: 12).to_f * 1000, weekend: day.saturday? || day.sunday? } } : [],
-      injections: injections.map { |i| { x: i.recorded_at.to_f * 1000, day: i.local_day.iso8601, label: "#{i.dose.to_s('F')} mg", site: i.site, side: i.side } },
+      injections: injections.map { |i| { x: i.recorded_at.to_f * 1000, day: i.local_day.iso8601, label: "#{i.dose.to_s('F')} mg", dose: i.dose.to_s('F'), site: i.site, side: i.side } },
       notes: notes.map { |n| { x: n.local_date.in_time_zone.change(hour: 12).to_f * 1000, day: n.local_date.iso8601, label: "Journal" } } }
   end
 

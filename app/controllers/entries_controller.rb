@@ -1,8 +1,9 @@
 class EntriesController < ApplicationController
   before_action :set_kind
+  before_action :set_calendar_date, only: [:new, :create]
   before_action :load_entry, only: [:edit, :update, :destroy]
   def new
-    @entry = scope.new(uuid: SecureRandom.uuid, occurred_at: Time.current.iso8601)
+    @entry = scope.new(uuid: SecureRandom.uuid, occurred_at: default_time.iso8601)
     @entry.unit = current_user.preferred_unit if @kind == "weight"
     @previous = current_user.injections.order(recorded_at: :desc).first
   end
@@ -33,6 +34,16 @@ class EntriesController < ApplicationController
   def set_kind
     @kind = params[:kind] == "injection" ? "injection" : "weight"
   end
+  # Set when logging from a calendar day: prefills the date and returns there.
+  def set_calendar_date
+    @calendar_date = Date.iso8601(params[:date]) if params[:date].is_a?(String) && params[:date].present?
+  rescue Date::Error
+    @calendar_date = nil
+  end
+  def default_time
+    return Time.current if @calendar_date.nil? || @calendar_date == Time.zone.today
+    @calendar_date.in_time_zone.change(hour: 12)
+  end
   def scope = @kind == "weight" ? current_user.weights : current_user.injections
   def load_entry = @entry = scope.find(params[:id])
   def entry_attributes
@@ -61,11 +72,12 @@ class EntriesController < ApplicationController
     invalid_response(template)
   end
   def saved_response(message)
+    path = @calendar_date ? calendar_path(month: @entry.local_day.strftime("%Y-%m")) : root_path
     if request.format.json?
       flash[:notice] = message
-      render json: { redirect_to: root_path }
+      render json: { redirect_to: path }
     else
-      redirect_to root_path, notice: message, status: :see_other
+      redirect_to path, notice: message, status: :see_other
     end
   end
   def invalid_response(template)

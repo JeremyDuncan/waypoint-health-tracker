@@ -1,7 +1,7 @@
 <% show_shot_labels = local_assigns.fetch(:shot_labels, false); offset = show_shot_labels && plot.injection_lanes.positive? ? plot.injection_lanes * 64 - 40 : 0 %>
 <figure class="weight-figure <%= 'weight-figure--days' if plot.days.any? %>">
   <div class="weight-figure-scroll weight-figure-wide">
-  <svg viewBox="0 0 720 <%= 280 + offset %>" role="img" aria-label="Actual weights connected over the selected dates, with orange guides for actual injection times">
+  <svg viewBox="0 0 720 <%= 280 + offset %>" role="img" aria-label="Actual weights connected over the selected dates, with guides for injection times">
     <% gradient_id = "weight-gradient-#{range.from.strftime('%Y%m%d')}-#{range.to.strftime('%Y%m%d')}" %>
     <defs><linearGradient id="<%= gradient_id %>" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" class="weight-gradient-top"/><stop offset="70%" class="weight-gradient-mid"/><stop offset="100%" class="weight-gradient-bottom"/></linearGradient></defs>
     <% if plot.area_points.size >= 2 %><path d="<%= plot_area_path(plot, offset: offset) %>" fill="url(#<%= gradient_id %>)" class="plot-area"/><% end %>
@@ -17,11 +17,11 @@
       <% if plot.estimate_segments.any? %><path d="<%= plot_estimate_path(plot, offset: offset) %>" class="plot-estimate"><title>Estimated between your nearest readings; not a measurement</title></path><% end %>
       <% plot.points.each do |point| %><a href="<%= journal_path(point[:weight].local_day) %>" aria-label="<%= point[:weight].recorded_at.in_time_zone.strftime('%A, %b %-d · %-I:%M %p') %>: <%= weight_label(point[:weight]) %>. Open day details."><circle cx="<%= 40 + point[:x] * 640 %>" cy="<%= 210 + offset - point[:y] * 160 %>" r="3" class="plot-point"><title><%= local_time_label(point[:weight].recorded_at) %> · <%= weight_label(point[:weight]) %></title></circle></a><% end %>
     <% end %>
-    <% plot.injections.each do |point| %><line x1="<%= 40 + point[:x] * 640 %>" x2="<%= 40 + point[:x] * 640 %>" y1="<%= show_shot_labels ? 58 + point[:lane] * 64 : 40 %>" y2="<%= 220 + offset %>" class="plot-shot"><title><%= local_time_label(point[:injection].recorded_at) %> · <%= point[:injection].dose %> mg</title></line><% end %>
+    <% plot.injections.each do |point| %><line x1="<%= 40 + point[:x] * 640 %>" x2="<%= 40 + point[:x] * 640 %>" y1="<%= show_shot_labels ? 58 + point[:lane] * 64 : 40 %>" y2="<%= 220 + offset %>" class="plot-shot <%= dose_class(point[:injection].dose) %>"><title><%= local_time_label(point[:injection].recorded_at) %> · <%= point[:injection].dose %> mg</title></line><% end %>
     <% if show_shot_labels %>
       <% plot.injections.each do |point| %>
         <% shot = point[:injection]; y = 4 + point[:lane] * 64 %>
-        <a class="weekly-shot-label" href="<%= journal_path(shot.local_day) %>" aria-label="<%= shot.dose.to_s('F') %> mg · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %> · <%= shot.recorded_at.in_time_zone.strftime('%A, %b %-d at %-I:%M %p %Z') %>. Open day details.">
+        <a class="weekly-shot-label <%= dose_class(shot.dose) %>" href="<%= journal_path(shot.local_day) %>" aria-label="<%= shot.dose.to_s('F') %> mg · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %> · <%= shot.recorded_at.in_time_zone.strftime('%A, %b %-d at %-I:%M %p %Z') %>. Open day details.">
           <rect x="<%= point[:label_x] - 75 %>" y="<%= y %>" width="150" height="54" rx="7" class="plot-shot-label-box"/>
           <text x="<%= point[:label_x] %>" y="<%= y + 16 %>" text-anchor="middle" class="plot-shot-dose"><%= shot.dose.to_s('F') %> mg</text>
           <text x="<%= point[:label_x] %>" y="<%= y + 31 %>" text-anchor="middle" class="plot-shot-site"><%= [shot.site, shot.side].compact_blank.join(' · ').presence || 'Site not recorded' %></text>
@@ -33,5 +33,6 @@
   </svg>
   </div>
   <%= render 'shared/weight_plot_compact', plot: plot, range: range, show_shot_labels: show_shot_labels %>
-  <figcaption class="small muted">Green: actual weigh-ins in <%= current_user.preferred_unit %>. Orange guides<%= ' and dose/location labels' if show_shot_labels %>: actual injections. Curves connect actual readings; missing days have no measurement.<%= " Dashed ends are estimated from your nearest readings before or after these dates; they are not measurements." if plot.estimate_segments.any? %> Tap a point to open its day.</figcaption>
+  <figcaption class="small muted">Weight in <%= current_user.preferred_unit %>; dashed vertical lines are shots.<%= " Dashed ends are estimates." if plot.estimate_segments.any? %></figcaption>
+  <%= render "shared/dose_key", doses: range.injections.map(&:dose) %>
 </figure>

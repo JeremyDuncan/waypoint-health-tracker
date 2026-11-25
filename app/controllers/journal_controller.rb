@@ -1,4 +1,5 @@
 class JournalController < ApplicationController
+  include LoadsDay
   before_action :load_day
   def show; end
   def update
@@ -8,9 +9,9 @@ class JournalController < ApplicationController
     if @note.save
       if request.format.json?
         flash[:notice] = "Journal saved."
-        render json: { redirect_to: journal_path(@date) }
+        render json: { redirect_to: saved_path }
       else
-        redirect_to journal_path(@date), notice: "Journal saved.", status: :see_other
+        redirect_to saved_path, notice: "Journal saved.", status: :see_other
       end
     else
       if request.format.json?
@@ -27,12 +28,5 @@ class JournalController < ApplicationController
     redirect_to journal_path(@date), notice: "Journal cleared.", status: :see_other
   end
   private
-  def load_day
-    @date = Date.iso8601(params[:date])
-    @note = current_user.day_notes.find_or_initialize_by(local_date: @date)
-    @weights = current_user.weights.where(recorded_at: @date.in_time_zone...(@date + 1).in_time_zone).order(:recorded_at)
-    @injections = current_user.injections.where(recorded_at: @date.in_time_zone...(@date + 1).in_time_zone).order(:recorded_at)
-  rescue Date::Error
-    raise ActionController::BadRequest, "Invalid calendar date"
-  end
+  def saved_path = params[:return_to] == "calendar" ? calendar_path(month: @date.strftime("%Y-%m")) : journal_path(@date)
 end

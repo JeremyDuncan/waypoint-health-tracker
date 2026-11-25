@@ -23,6 +23,14 @@ class RenphoImportTest < ActionDispatch::IntegrationTest
     assert_difference("@user.weights.count", 2) { post commit_import_path(batch) }
     assert_response :see_other
     assert_no_difference("Weight.count") { post commit_import_path(batch) }
+    post imports_path, params: { format_kind: "csv", file: Rack::Test::UploadedFile.new(Rails.root.join("docs/examples/renpho-weights.csv"), "text/csv") }
+    repeat = @user.import_batches.where(committed_at: nil).first
+    post preview_import_path(repeat), params: { time_zone: "Europe/London" }
+    follow_redirect!
+    assert_select ".import-counts", text: /0 creates.*2 duplicates skipped/m
+    assert_select 'input[type="submit"][value="Nothing new to import"][disabled]'
+    assert_no_difference("Weight.count") { post commit_import_path(repeat) }
+    assert_equal "Imported 0 new entries. Skipped 2 duplicates.", flash[:notice]
     other = create_user("other@example.test")
     login(other)
     get import_path(batch)

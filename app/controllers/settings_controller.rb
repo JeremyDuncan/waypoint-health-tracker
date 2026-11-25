@@ -1,5 +1,5 @@
 class SettingsController < ApplicationController
-  before_action :load_backup_status, only: [:show, :update, :change_password]
+  before_action :load_backup_status, only: [:show, :update, :change_password, :clear_history]
   def show; end
   def update
     attrs = params.require(:user).permit(:preferred_unit, :time_zone, :reminder_local, enabled_metrics: []).to_h
@@ -38,6 +38,15 @@ class SettingsController < ApplicationController
       terminate_session
       redirect_to new_session_path, notice: "Password changed. Sign in again on each device.", status: :see_other
     else
+      render :show, status: :unprocessable_entity
+    end
+  end
+  def clear_history
+    if params[:confirmation].to_s.strip == User::CLEAR_HISTORY_PHRASE
+      current_user.clear_health_history!
+      redirect_to settings_path, notice: "Health history cleared.", status: :see_other
+    else
+      @history_error = "Nothing was deleted. Type #{User::CLEAR_HISTORY_PHRASE} exactly to confirm."
       render :show, status: :unprocessable_entity
     end
   end

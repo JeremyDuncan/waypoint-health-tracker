@@ -5,7 +5,7 @@
    top = 12 + offset; base = top + height
    view_height = base + (plot.days.any? ? 40 : 24) %>
 <div class="weight-figure-compact">
-  <svg viewBox="0 0 360 <%= view_height %>" role="img" aria-label="Actual weights connected over the selected dates, with orange guides for actual injection times">
+  <svg viewBox="0 0 360 <%= view_height %>" role="img" aria-label="Actual weights connected over the selected dates, with guides for injection times">
     <% gradient_id = "weight-gradient-compact-#{range.from.strftime('%Y%m%d')}-#{range.to.strftime('%Y%m%d')}" %>
     <defs><linearGradient id="<%= gradient_id %>" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" class="weight-gradient-top"/><stop offset="70%" class="weight-gradient-mid"/><stop offset="100%" class="weight-gradient-bottom"/></linearGradient></defs>
     <% if plot.area_points.size >= 2 %><path d="<%= plot_area_path(plot, left: left, width: width, base: base, height: height) %>" fill="url(#<%= gradient_id %>)" class="plot-area"/><% end %>
@@ -23,11 +23,11 @@
     <% end %>
     <% plot.injections.each do |point| %>
       <% placed = shots.find { |shot| shot[:injection] == point[:injection] } %>
-      <line x1="<%= left + point[:x] * width %>" x2="<%= left + point[:x] * width %>" y1="<%= placed ? 2 + placed[:lane] * lane_step + 20 : top %>" y2="<%= base %>" class="plot-shot"><title><%= local_time_label(point[:injection].recorded_at) %> · <%= point[:injection].dose %> mg</title></line>
+      <line x1="<%= left + point[:x] * width %>" x2="<%= left + point[:x] * width %>" y1="<%= placed ? 2 + placed[:lane] * lane_step + 20 : top %>" y2="<%= base %>" class="plot-shot <%= dose_class(point[:injection].dose) %>"><title><%= local_time_label(point[:injection].recorded_at) %> · <%= point[:injection].dose %> mg</title></line>
     <% end %>
     <% shots.each do |point| %>
       <% shot = point[:injection]; y = 2 + point[:lane] * lane_step %>
-      <a class="plot-shot-pill" href="<%= journal_path(shot.local_day) %>" aria-label="<%= shot.dose.to_s('F') %> mg · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %> · <%= shot.recorded_at.in_time_zone.strftime('%A, %b %-d at %-I:%M %p %Z') %>. Open day details.">
+      <a class="plot-shot-pill <%= dose_class(shot.dose) %>" href="<%= journal_path(shot.local_day) %>" aria-label="<%= shot.dose.to_s('F') %> mg · <%= [shot.site, shot.side].compact_blank.join(' / ').presence || 'Site not recorded' %> · <%= shot.recorded_at.in_time_zone.strftime('%A, %b %-d at %-I:%M %p %Z') %>. Open day details.">
         <rect x="<%= point[:label_x] - pill_half %>" y="<%= y %>" width="<%= pill_half * 2 %>" height="20" rx="10" class="plot-shot-label-box"/>
         <text x="<%= point[:label_x] %>" y="<%= y + 14 %>" text-anchor="middle" class="plot-shot-dose"><%= shot.dose.to_s('F') %> mg</text>
       </a>

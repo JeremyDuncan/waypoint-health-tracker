@@ -1,4 +1,5 @@
 class User < ApplicationRecord
+  CLEAR_HISTORY_PHRASE = "DELETE"
   has_secure_password
   has_many :sessions, dependent: :destroy
   has_many :weights, dependent: :destroy
@@ -27,6 +28,12 @@ class User < ApplicationRecord
         errors.add(:weight_goal, goal.errors.full_messages.join("; ")) unless goal.valid?
       end
     end
+  end
+  # Uploaded import files hold copies of the same readings, so they go too.
+  # The account, sessions, preferences and goal are kept. The lock keeps an import
+  # from committing halfway through.
+  def clear_health_history!
+    with_lock { [weights, injections, day_notes, import_batches].each(&:delete_all) }
   end
   def preferences
     { "preferred_unit" => preferred_unit, "time_zone" => time_zone, "enabled_metrics" => enabled_metrics,

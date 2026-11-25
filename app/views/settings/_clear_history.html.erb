@@ -1,0 +1,21 @@
+<% counts = [[current_user.weights.count, "weigh-in"], [current_user.injections.count, "injection"], [current_user.day_notes.count, "journal day"]] %>
+<section class="card form-card" data-controller="modal confirm-phrase" data-modal-open-value="<%= @history_error.present? %>" data-confirm-phrase-phrase-value="<%= User::CLEAR_HISTORY_PHRASE %>" data-action="modal:closed->confirm-phrase#reset">
+  <h2>Clear health history</h2>
+  <p class="muted">Deletes all entries and uploaded import files. Keeps your account, preferences and goal.</p>
+  <button type="button" class="button danger-outline" data-action="modal#open">Clear health history…</button>
+  <dialog class="goal-dialog" data-modal-target="dialog" data-action="close->modal#closed click->modal#backdrop" aria-labelledby="clear-history-title" aria-describedby="clear-history-summary">
+    <div class="dialog-heading"><h2 id="clear-history-title">Clear all health history?</h2><button type="button" class="dialog-close" data-action="modal#close" aria-label="Close without deleting">×</button></div>
+    <div id="clear-history-summary" class="dialog-summary">
+      <p>This permanently deletes <strong><%= counts.map { |count, name| pluralize(count, name) }.to_sentence %></strong>.</p>
+      <p class="muted">This can’t be undone. <%= link_to "Download an export", export_path("json"), data: { turbo: false } %> first to keep a copy. Server backups are not affected.</p>
+    </div>
+    <% if @history_error %><div class="errors" role="alert"><p><%= @history_error %></p></div><% end %>
+    <%= form_with url: settings_history_path, method: :delete, class: "stack" do |f| %>
+      <div>
+        <%= f.label :confirmation, "Type #{User::CLEAR_HISTORY_PHRASE} to confirm" %>
+        <%= f.text_field :confirmation, value: nil, required: true, autofocus: true, autocomplete: "off", autocapitalize: "characters", spellcheck: false, data: { confirm_phrase_target: "input", action: "confirm-phrase#check" } %>
+      </div>
+      <div class="dialog-actions"><button type="button" class="button secondary" data-action="modal#close">Cancel</button><%= f.submit "Delete everything", class: "button danger", disabled: true, data: { confirm_phrase_target: "submit" } %></div>
+    <% end %>
+  </dialog>
+</section>
