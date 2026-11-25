@@ -1,9 +1,13 @@
 <section class="page-intro">
   <div>
-    <div class="eyebrow">YOUR DAILY RECORD</div>
     <h1>Your month, at a glance.</h1>
-    <p class="muted">Every check-in and every journal entry, in one place.</p>
   </div>
   <%= link_to "Open today’s journal →", journal_path(Time.zone.today), class: "button secondary" %>
 </section>
-<div class="calendar-page"><%= render "calendar", calendar: @calendar %></div>
+<div class="calendar-page" data-controller="modal">
+  <%= render "calendar", calendar: @calendar %>
+  <dialog class="goal-dialog day-dialog" data-modal-target="dialog" data-action="close->modal#closed click->modal#backdrop" aria-label="Calendar day">
+    <div class="dialog-heading"><button type="button" class="dialog-close" data-action="modal#close" aria-label="Close day">×</button></div>
+    <%= turbo_frame_tag "calendar-day", data: { controller: "frame-fallback", action: "turbo:frame-missing->frame-fallback#visit" } %>
+  </dialog>
+</div>

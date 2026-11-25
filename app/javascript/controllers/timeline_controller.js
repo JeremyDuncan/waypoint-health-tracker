@@ -45,12 +45,11 @@ export default class extends Controller {
     const laneCount = Math.max(0, ...lanes.map(item => item.lane + 1))
     this.canvasTarget.parentElement.style.height = `${(this.scrollTarget.clientWidth < 700 ? 220 : 265) + laneCount * lane.height}px`
     this.explanationTarget.textContent = {
-      raw: "Each point is an actual weigh-in, at its recorded time. Lines connect consecutive weigh-ins; days without a measurement have no point.",
-      weekly: "Weekly average = arithmetic mean of all weigh-ins in each Monday–Sunday local week within this range. Points sit at that week’s last actual reading; partial weeks use only selected readings. Lines connect averages; empty weeks have no point.",
-      monthly: "Monthly average = arithmetic mean of all individual weigh-ins in each local calendar month within this range, not a mean of daily averages. Points sit at that month’s last actual reading; partial months use only selected readings. Lines connect averages; empty months have no point."
+      raw: "Each point is a weigh-in.",
+      weekly: "Average per Monday–Sunday week.",
+      monthly: "Average per calendar month."
     }[mode]
-    if (showTrend) this.explanationTarget.textContent += " Dashed trend: arithmetic mean of all readings in the preceding 168 hours through each actual reading, including earlier context outside this range. No daily values are filled in."
-    this.explanationTarget.textContent += " Curves smooth the display between measured points; they do not add readings."
+    if (showTrend) this.explanationTarget.textContent += " Dashed: average of the last 7 days."
     this.chart?.destroy()
     this.chart = new globalThis.Chart(this.canvasTarget, {
       type: "line",
@@ -108,6 +107,7 @@ export default class extends Controller {
     gradient.addColorStop(1, `${color}00`)
     return gradient
   }
+  doseClass(event) { return `dose-${String(Number(event.dose)).replace(".", "-")}` }
   // Phones get short dose-only pills so stacked labels don't push the chart off screen.
   get compact() { return this.scrollTarget.clientWidth < 500 }
   get laneSize() { return this.compact ? { half: 27, height: 30 } : { half: 56, height: 62 } }
@@ -132,12 +132,12 @@ export default class extends Controller {
     const events = this.injectionLanes(this.payloadValue.injections, event => this.chart.scales.x.getPixelForValue(event.x))
     events.forEach(({ event, x, lane }) => {
       const guide = document.createElement("span")
-      guide.className = "injection-guide"
+      guide.className = `injection-guide ${this.doseClass(event)}`
       const top = this.compact ? 14 : 20
       guide.style.left = `${x}px`; guide.style.top = `${top}px`; guide.style.height = `${area.bottom - top}px`
       guide.setAttribute("aria-hidden", "true")
       const label = document.createElement("button")
-      label.type = "button"; label.className = `event-marker injection injection-dose${this.compact ? " compact" : ""}`
+      label.type = "button"; label.className = `event-marker injection injection-dose ${this.doseClass(event)}${this.compact ? " compact" : ""}`
       label.style.left = `${x}px`; label.style.top = `${top + lane * this.laneSize.height}px`
       for (const [kind, text] of [["dose", event.label], ["date", new Intl.DateTimeFormat("en-US", { timeZone: this.payloadValue.zone, weekday: "short", month: "short", day: "numeric" }).format(event.x)], ["time", new Intl.DateTimeFormat("en-US", { timeZone: this.payloadValue.zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(event.x)]]) {
         const span = document.createElement("span"); span.className = `shot-label-${kind}`; span.textContent = text; label.append(span)
@@ -160,7 +160,7 @@ export default class extends Controller {
       }
       if (!Number.isFinite(y)) return
       const marker = document.createElement("button")
-      marker.type = "button"; marker.className = "injection-on-line"
+      marker.type = "button"; marker.className = `injection-on-line ${this.doseClass(event)}`
       marker.style.left = `${x}px`; marker.style.top = `${y}px`
       marker.title = label.title
       marker.setAttribute("aria-label", `${event.day}: ${event.label} injection on the displayed timeline. Open day details.`)

@@ -49,6 +49,15 @@ test('main navigation collapses into an accessible menu on phones and stays inli
   await expect(menu).toHaveAttribute('aria-expanded', 'false');
   await menu.click();
   await expect(nav.getByRole('link', { name: 'Calendar', exact: true })).toHaveClass(/active/);
+  await page.keyboard.press('Escape');
+
+  // Opening the menu partway down a page keeps the header and menu in view, without moving the page.
+  await page.goto('/settings');
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await menu.click();
+  expect((await page.locator('.site-header').boundingBox()).y).toBeCloseTo(0, 0);
+  await expect(nav.getByRole('link', { name: 'Overview', exact: true })).toBeInViewport();
+  expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(600);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   expect(errors).toEqual([]);
 });

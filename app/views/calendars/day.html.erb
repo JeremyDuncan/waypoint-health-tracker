@@ -1,0 +1,20 @@
+<%= turbo_frame_tag "calendar-day", target: "_top" do %>
+  <section class="day-panel">
+    <h2><%= @date.strftime("%A, %B %-d, %Y") %></h2>
+    <div class="day-actions">
+      <%= link_to "＋ Weight", new_entry_path(kind: "weight", date: @date), class: "button primary" %>
+      <%= link_to "＋ Injection", new_entry_path(kind: "injection", date: @date), class: "button secondary" %>
+    </div>
+    <% if @weights.any? || @injections.any? %>
+      <ul class="day-list">
+        <% @weights.each do |weight| %><li><div><strong><%= weight_label(weight) %></strong><br><span class="small muted"><%= local_time_label(weight.recorded_at) %></span></div><%= link_to "Edit", edit_entry_path(weight, kind: "weight"), aria: { label: "Edit #{weight_label(weight)} weigh-in" }, data: { turbo_frame: "_top" } %></li><% end %>
+        <% @injections.each do |shot| %><li><div><strong><%= dose_dot(shot.dose) %><%= shot.dose.to_s("F") %> mg</strong> <%= [shot.site, shot.side].compact_blank.join(" · ") %><br><span class="small muted"><%= local_time_label(shot.recorded_at) %></span></div><%= link_to "Edit", edit_entry_path(shot, kind: "injection"), aria: { label: "Edit #{shot.dose.to_s('F')} mg injection" }, data: { turbo_frame: "_top" } %></li><% end %>
+      </ul>
+    <% end %>
+    <details <%= "open" if @note.persisted? %>>
+      <summary><%= @note.persisted? ? "Notes & metrics" : "＋ Notes & metrics" %></summary>
+      <%= render "journal/form", return_to: "calendar" %>
+    </details>
+    <%= link_to "Open full day →", journal_path(@date), class: "small", data: { turbo_frame: "_top" } %>
+  </section>
+<% end %>

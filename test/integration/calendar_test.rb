@@ -39,7 +39,7 @@ class CalendarTest < ActionDispatch::IntegrationTest
     assert_select '[data-calendar-date="2026-11-01"] .calendar-journal', 0
     assert_select '[data-calendar-date="2026-10-31"]', 0
     assert_select '[data-calendar-date="2026-12-01"]', 0
-    assert_select '[data-calendar-date="2026-11-04"][href="/journal/2026-11-04"][data-turbo-frame="_top"]', 1
+    assert_select '[data-calendar-date="2026-11-04"][href="/calendar/2026-11-04"][data-turbo-frame="calendar-day"]', 1
     refute_includes response.body, "other-private-calendar-note"
     # Month navigation stays on the dedicated calendar page.
     assert_select '.calendar-navigation a[aria-label="Next calendar month"]' do |links|
@@ -68,11 +68,11 @@ class CalendarTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "Calendar note"
   end
 
-  test "month navigation handles leap days and year boundaries and empty days open journals" do
+  test "month navigation handles leap days and year boundaries and empty days can be opened" do
     get calendar_path(month: "2024-02")
     assert_response :success
     assert_select "a.calendar-day", 29
-    assert_select '[data-calendar-date="2024-02-29"][href="/journal/2024-02-29"]', 1
+    assert_select '[data-calendar-date="2024-02-29"][href="/calendar/2024-02-29"]', 1
     assert_select ".calendar-empty", text: /No entries this month/
     get calendar_path(month: "2026-12")
     assert_select '.calendar-navigation a[aria-label="Next calendar month"]' do |links|
@@ -90,5 +90,56 @@ class CalendarTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select ".flash.alert", text: /Choose a calendar month/
     assert_select "#month-calendar", 1
+  end
+
+  test "a calendar day shows its own entries and offers forms for that date" do
+    get calendar_day_path("2026-11-03"), headers: { "Turbo-Frame" => "calendar-day" }
+    assert_response :success
+    assert_select "turbo-frame#calendar-day" do
+      assert_select ".day-list li", 1
+      assert_select ".day-list .dose-dot.dose-5", 1
+      assert_select "a[href=?]", new_entry_path(kind: "weight", date: "2026-11-03")
+      assert_select "a[href=?]", new_entry_path(kind: "injection", date: "2026-11-03")
+      assert_select "form[action=?] input[name=return_to][value=calendar]", journal_path("2026-11-03")
+    end
+    get new_entry_path(kind: "weight", date: "2026-11-03")
+    assert_select "input[type=datetime-local][value=?]", "2026-11-03T12:00"
+    assert_select "input[type=hidden][name=date][value=?]", "2026-11-03"
+    get new_entry_path(kind: "weight", date: "not-a-date")
+    assert_response :success
+    assert_select "input[type=hidden][name=date]", 0
+    delete session_path
+    get calendar_day_path("2026-11-03")
+    assert_redirected_to new_session_path
+  end
+
+  test "entries and journals added from the calendar return to their month" do
+    { "weight" => { value: "199", unit: "lb" }, "injection" => { dose: "7.5" } }.each do |kind, attrs|
+      params = { date: "2026-11-20", entry: { id: SecureRandom.uuid, local_time: "2026-11-20T12:00", **attrs } }
+      2.times do
+        post entries_path(kind: kind), params: params, as: :json
+        assert_equal calendar_path(month: "2026-11"), response.parsed_body["redirect_to"]
+      end
+    end
+    put journal_path("2026-11-20"), params: { return_to: "calendar", day_note: { notes: "From calendar" } }
+    assert_redirected_to calendar_path(month: "2026-11")
+    get calendar_path(month: "2026-11")
+    assert_select '[data-calendar-date="2026-11-20"]' do
+      assert_select ".calendar-weight", text: /1/
+      assert_select ".calendar-injection.dose-7-5", text: /7.5 mg/
+      assert_select ".calendar-journal", 1
+    end
+    post entries_path(kind: "weight"), params: { entry: { id: SecureRandom.uuid, local_time: "2026-11-21T12:00", value: "198", unit: "lb" } }, as: :json
+    assert_equal root_path, response.parsed_body["redirect_to"]
+  end
+
+  test "every dose has its own color in both themes" do
+    css = Rails.root.join("app/assets/stylesheets/application.css").read
+    helper = ApplicationController.helpers
+    names = InjectionInsights::DOSES.map { |dose| helper.dose_class(dose) }
+    assert_equal %w[dose-2-5 dose-5 dose-7-5 dose-10 dose-12-5 dose-15], names
+    palettes = names.map { |name| css.scan(/--#{name}:(#\h{6})/).flatten }
+    assert_equal [3], palettes.map(&:size).uniq
+    palettes.transpose.each { |theme| assert_equal theme.uniq, theme }
   end
 end

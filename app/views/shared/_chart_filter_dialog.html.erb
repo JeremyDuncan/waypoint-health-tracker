@@ -1,6 +1,5 @@
 <dialog class="goal-dialog filter-dialog" data-modal-target="dialog" data-action="close->modal#closed click->modal#backdrop" aria-labelledby="chart-filter-title">
   <div class="dialog-heading"><h2 id="chart-filter-title"><%= page == 'overview' ? 'Overview filters' : 'Injection filters' %></h2><button type="button" class="dialog-close" data-action="modal#close" aria-label="Close filters">×</button></div>
-  <p class="small muted">Saved to your account. Changing dates keeps your chart view selected.</p>
   <%= form_with scope: :preferences, url: chart_preferences_path(page: page), method: :patch, class: 'stack', data: { controller: 'date-range', chart_preferences_target: 'form' } do |f| %>
     <% (page == 'overview' ? %w[mode trend weight injections notes] : %w[mode]).each do |key| %><%= f.hidden_field key, value: @chart_preferences[key], data: { chart_preferences_target: 'preserved', key: key } %><% end %>
     <div><%= f.label :range, 'Date range' %><%= f.select :range, [['Last 7 days','7'],['Last 30 days','30'],['Last 90 days','90'],['Last year','365'],['All time','all'],['Custom dates','custom']], { selected: @filter_values['range'] }, autofocus: true, data: { date_range_target: 'range' } %></div>
@@ -9,9 +8,8 @@
       <div><%= f.label :site, 'Location' %><%= f.select :site, [['All locations','all'],['Abdomen','Abdomen'],['Thigh','Thigh'],['Upper arm','Upper arm'],['Not recorded','unknown']], selected: @filter_values['site'] %></div>
       <div class="two-columns"><div><%= f.label :side, 'Side' %><%= f.select :side, [['Both / all','all'],['Left','Left'],['Right','Right'],['Not recorded','unknown']], selected: @filter_values['side'] %></div><div><%= f.label :dose, 'Dose' %><%= f.select :dose, [['All doses','all']] + InjectionInsights::DOSES.map { |dose| ["#{dose.to_s('F')} mg",dose.to_s('F')] }, selected: @filter_values['dose'] %></div></div>
       <div><%= f.label :grouping, 'Compare locations by' %><%= f.select :grouping, [['Site + side','site_side'],['Site only','site']], selected: @filter_values['grouping'] %></div>
-      <p class="small muted">Dates select actual shots. Their measurement windows may extend up to seven local days beyond those dates.</p>
     <% end %>
     <div class="dialog-actions"><button type="button" class="button secondary" data-action="modal#close">Cancel</button><%= f.submit 'Apply filters', class: 'button primary', data: { chart_preferences_target: 'submit' } %></div>
   <% end %>
-  <div class="filter-defaults"><%= button_to 'Clear / defaults', chart_preferences_path(page: page), method: :delete, class: 'button secondary', data: { chart_preferences_target: 'submit' } %><p class="small muted"><%= page == 'overview' ? 'Restore 30 days, every weigh-in, all layers visible and trend off.' : 'Restore 90 days, all locations/sides/doses, site + side comparisons and calendar dates.' %></p></div>
+  <div class="filter-defaults"><%= button_to 'Clear / defaults', chart_preferences_path(page: page), method: :delete, class: 'button secondary', data: { chart_preferences_target: 'submit' } %></div>
 </dialog>

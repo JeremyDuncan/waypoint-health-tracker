@@ -1,0 +1,11 @@
+<%= form_with scope: :day_note, url: journal_path(@date), method: :put, class: "stack", data: { controller: "save", action: "submit->save#submit input->save#changed", turbo: false } do |f| %>
+  <%= hidden_field_tag :return_to, return_to, id: nil if return_to %>
+  <div><%= f.label :notes, "Day notes" %><%= f.text_area :notes, value: @note.notes, rows: 5, maxlength: 10000, placeholder: "How you’re feeling, what you noticed…" %></div>
+  <% (current_user.enabled_metrics + @note.metrics.keys).uniq.each do |key| %>
+    <% definition = MetricDefinitions::ALL.fetch(key) %>
+    <div><%= label_tag "day_note_metrics_#{key}", "#{definition['label']} (#{definition['unit']})" %><% if key == "side_effects" %><%= text_area_tag "day_note[metrics][#{key}]", @note.metrics[key], id: "day_note_metrics_#{key}", rows: 2, maxlength: 2000 %><% else %><%= number_field_tag "day_note[metrics][#{key}]", @note.metrics[key], id: "day_note_metrics_#{key}", min: definition["min"], max: definition["max"], step: "any", inputmode: "decimal" %><% end %></div>
+  <% end %>
+  <p class="small muted"><%= link_to "Choose metrics to track →", settings_path, data: { turbo_frame: "_top" } %></p>
+  <p class="save-status" role="status" data-save-target="status"></p>
+  <%= f.submit "Save journal", class: "button primary", data: { save_target: "button" } %>
+<% end %>

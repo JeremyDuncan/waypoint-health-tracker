@@ -11,12 +11,16 @@ class MonthCalendar
       today.beginning_of_month
     end
 
-    @days = Hash.new { |days, date| days[date] = { weights: 0, injections: 0, journal: nil } }
+    @days = Hash.new { |days, date| days[date] = { weights: 0, injections: 0, doses: [], journal: nil } }
     interval = month.in_time_zone(zone)...month.next_month.in_time_zone(zone)
     weights = user.weights.where(recorded_at: interval).pluck(:recorded_at)
-    injections = user.injections.where(recorded_at: interval).pluck(:recorded_at)
+    injections = user.injections.where(recorded_at: interval).order(:recorded_at).pluck(:recorded_at, :dose)
     weights.each { |time| @days[time.in_time_zone(zone).to_date][:weights] += 1 }
-    injections.each { |time| @days[time.in_time_zone(zone).to_date][:injections] += 1 }
+    injections.each do |time, dose|
+      day = @days[time.in_time_zone(zone).to_date]
+      day[:injections] += 1
+      day[:doses] << dose
+    end
     @weight_count, @injection_count = weights.length, injections.length
 
     @journal_count = 0
@@ -36,8 +40,8 @@ class MonthCalendar
     events = events_on(date)
     entries = []
     entries << "#{events[:weights]} #{events[:weights] == 1 ? 'weigh-in' : 'weigh-ins'}" if events[:weights] > 0
-    entries << "#{events[:injections]} #{events[:injections] == 1 ? 'injection' : 'injections'}" if events[:injections] > 0
+    entries << "#{events[:injections]} #{events[:injections] == 1 ? 'injection' : 'injections'} (#{events[:doses].uniq.map { |dose| "#{dose.to_s('F')} mg" }.join(', ')})" if events[:injections] > 0
     entries << (events[:journal].notes.present? ? "journal note" : "journal metrics") if events[:journal]
-    "#{date.strftime('%A, %B %-d, %Y')}: #{entries.presence&.join(', ') || 'no entries yet'}. Open journal."
+    "#{date.strftime('%A, %B %-d, %Y')}: #{entries.presence&.join(', ') || 'no entries yet'}. Add or view entries."
   end
 end

@@ -51,9 +51,9 @@ test('quick logging, actual events, weekly mode, journal, filters and offline re
   const injectionCount = await page.locator('.event-marker.injection').count();
   await page.getByRole('combobox', { name: 'View', exact: true }).selectOption('weekly');
   await expect(page.locator('.event-marker.injection')).toHaveCount(injectionCount);
-  await expect(page.locator('[data-timeline-target="explanation"]')).toContainText('arithmetic mean');
+  await expect(page.locator('[data-timeline-target="explanation"]')).toContainText('Average per Monday–Sunday week');
   await page.getByRole('combobox', { name: 'View', exact: true }).selectOption('monthly');
-  await expect(page.locator('[data-timeline-target="explanation"]')).toContainText('local calendar month');
+  await expect(page.locator('[data-timeline-target="explanation"]')).toContainText('Average per calendar month');
   await expect(page.locator('.event-marker.injection')).toHaveCount(injectionCount);
   await expect(page.locator('.event-marker.journal').first()).toBeVisible();
   const monthly = await page.locator('[data-controller="timeline"]').evaluate(element => {
