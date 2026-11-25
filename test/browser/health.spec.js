@@ -104,6 +104,7 @@ test('CSV mapping preview and duplicate-safe commit', async ({ page }) => {
   await page.getByRole('button', { name: 'Validate & preview rows' }).click();
   await expect(page.getByRole('heading', { name: 'Import preview' })).toBeVisible();
   await expect(page.locator('.import-counts')).toContainText('0 conflicts');
+  await expect(page.locator('p.errors')).toHaveCount(0);
   // Repeat runs against the same account have nothing left to import.
   const nothingNew = page.getByRole('button', { name: 'Nothing new to import' });
   const importNew = page.getByRole('button', { name: /^Import \d+ new entr(y|ies)$/ });

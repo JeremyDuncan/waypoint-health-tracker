@@ -127,7 +127,9 @@ test('weekday context, smooth curves, shot labels and goal metrics with an acces
   await expect(page.locator('.shot-card[open]').first()).toBeVisible();
   await page.locator('.insights-hero-grid').screenshot({ path: `test/artifacts/${testInfo.project.name}-injection-calendar-history.png` });
   await page.getByRole('combobox', { name: 'Chart view', exact: true }).selectOption('aligned');
-  await expect(page.locator('[data-injection-insights-target="timelineExplanation"]')).toContainText('Each line is one shot');
+  // Readings dated after the current time are not paired yet, so there may be nothing to compare.
+  const compared = await page.locator('[data-controller~="injection-insights"]').evaluate(element => JSON.parse(element.dataset.injectionInsightsPayloadValue).trajectories.length);
+  await expect(page.locator('[data-injection-insights-target="timelineExplanation"]')).toHaveText(compared ? /Each line is one shot/ : '');
   await page.locator('section[aria-labelledby="trajectory-heading"]').screenshot({ path: `test/artifacts/${testInfo.project.name}-aligned-chart-controls.png` });
   await expect(page.locator('.injection-calendar-marker')).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Chart view', exact: true }).selectOption('calendar');

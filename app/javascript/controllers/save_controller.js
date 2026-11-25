@@ -14,7 +14,19 @@ export default class extends Controller {
   }
   disconnect() { window.removeEventListener("offline", this.offline); window.removeEventListener("beforeunload", this.unload) }
   changed() { this.dirty = true; this.message("Not saved yet.") }
-  message(text, error = false) { this.statusTarget.textContent = text; this.statusTarget.classList.toggle("errors", error) }
+  message(text, error = false) {
+    if (!this.element.isConnected) return this.announce("Your earlier entry was NOT saved. Please enter it again.", true)
+    this.statusTarget.textContent = text; this.statusTarget.classList.toggle("errors", error)
+  }
+  // Reports on a form that is no longer on the page, above whatever replaced it.
+  announce(text, error = false) {
+    const notice = document.createElement("div")
+    notice.className = `flash ${error ? "alert" : "notice"}`
+    notice.setAttribute("role", error ? "alert" : "status")
+    notice.textContent = text
+    const host = document.querySelector("dialog[open]") || document.getElementById("main")
+    host?.prepend(notice)
+  }
   async submit(event) {
     event.preventDefault()
     if (this.saving) return
@@ -31,6 +43,8 @@ export default class extends Controller {
         const result = await response.json()
         if (response.ok && result.redirect_to) {
           this.dirty = false
+          // Another form may have replaced this one; navigating would discard its draft.
+          if (!this.element.isConnected) return this.announce("Your earlier entry was saved.")
           this.message("Saved.")
           globalThis.Turbo.visit(result.redirect_to)
         } else {

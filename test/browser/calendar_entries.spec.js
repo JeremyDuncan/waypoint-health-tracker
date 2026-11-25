@@ -85,3 +85,66 @@ test('a calendar day adds weight, injections and notes, and shots can be compare
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   expect(errors).toEqual([]);
 });
+
+test.describe('slow or failed requests', () => {
+  // Routing cannot see requests from a page the service worker controls in WebKit.
+  test.use({ serviceWorkers: 'block' });
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/session/new');
+    await page.getByLabel('Email', { exact: true }).fill(process.env.TEST_EMAIL || 'demo@example.test');
+    await page.getByLabel('Password', { exact: true }).fill(process.env.TEST_PASSWORD || 'synthetic-pass-123');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your health, over time.' })).toBeVisible();
+    await page.goto('/calendar?month=2026-09');
+  });
+
+  const openNotes = async dialog => {
+    const notes = dialog.locator('details');
+    await expect(notes).toBeVisible();
+    if (!await notes.evaluate(element => element.open)) await notes.locator('summary').click();
+    return dialog.getByLabel('Day notes', { exact: true });
+  };
+
+  test('another day is never left editable while a day loads or after it fails', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: 'Calendar day' });
+    const day = date => page.locator(`[data-calendar-date="${date}"]`);
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    await page.route('**/calendar/2026-09-02', async route => { await held; await route.abort(); });
+    await day('2026-09-01').click();
+    await (await openNotes(dialog)).fill('Draft for September 1');
+    await dialog.getByRole('button', { name: 'Close day' }).click();
+    await day('2026-09-02').click();
+    await expect(dialog).toContainText('Loading…');
+    await expect(dialog.locator('form')).toHaveCount(0);
+    release();
+    await expect(dialog).toContainText('Couldn’t load this');
+    await expect(dialog.locator('form')).toHaveCount(0);
+    await page.unroute('**/calendar/2026-09-02');
+    await dialog.getByRole('button', { name: 'Close day' }).click();
+    await day('2026-09-02').click();
+    await expect(dialog.getByRole('heading', { name: 'Wednesday, September 2, 2026' })).toBeVisible();
+  });
+
+  for (const outcome of ['saved', 'NOT saved']) {
+    test(`a late save that was ${outcome} keeps the next day's draft`, async ({ page }) => {
+      const dialog = page.getByRole('dialog', { name: 'Calendar day' });
+      const day = date => page.locator(`[data-calendar-date="${date}"]`);
+      let release;
+      const held = new Promise(resolve => { release = resolve; });
+      await page.route('**/journal/2026-09-03', async route => { await held; await (outcome === 'saved' ? route.continue() : route.abort()); });
+      await day('2026-09-03').click();
+      await (await openNotes(dialog)).fill('Saved slowly');
+      await dialog.getByRole('button', { name: 'Save journal', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Close day' }).click();
+      await day('2026-09-04').click();
+      await expect(dialog.getByRole('heading', { name: 'Friday, September 4, 2026' })).toBeVisible();
+      const draft = await openNotes(dialog);
+      await draft.fill('Unsaved draft');
+      release();
+      await expect(dialog.locator('.flash')).toContainText(`earlier entry was ${outcome}`);
+      await expect(draft).toHaveValue('Unsaved draft');
+    });
+  }
+});

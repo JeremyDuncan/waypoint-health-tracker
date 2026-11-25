@@ -102,6 +102,26 @@ class PersonalImportTest < ActiveSupport::TestCase
     report = PersonalImport.new(@user, { "records" => { "injections" => [shot] } }).report
     assert_equal 1, report["duplicates"]
   end
+  test "rows with the same ID are duplicates when only their notation differs and conflicts when content differs" do
+    shot = @user.injections.first
+    weight = @user.weights.first
+    utc = ->(record) { record.recorded_at.utc.iso8601(6) }
+    report = ->(kind, row) { PersonalImport.new(@user, { "records" => { kind => [row] } }).report.values_at("creates", "duplicates", "conflicts") }
+    row = weight.portable.merge("occurred_at" => utc.(weight))
+    assert_not_equal weight.occurred_at, row["occurred_at"]
+    assert_equal [0, 1, 0], report.("weights", row)
+    assert_equal [0, 0, 1], report.("weights", row.merge("value" => "150.0"))
+    assert_equal [0, 0, 1], report.("weights", row.merge("occurred_at" => (weight.recorded_at + 1).utc.iso8601(6)))
+    shot.update!(site: nil, side: "", notes: nil)
+    row = shot.portable.merge("occurred_at" => utc.(shot), "site" => "", "side" => nil, "notes" => "")
+    assert_equal [0, 1, 0], report.("injections", row)
+    assert_equal [0, 0, 1], report.("injections", row.merge("site" => "Thigh"))
+    # The same rule applies to a repeated ID inside one file.
+    fresh = { "id" => SecureRandom.uuid, "occurred_at" => "2026-11-05T13:00:00Z", "value" => "200.0", "unit" => "lb" }
+    repeated = fresh.merge("occurred_at" => "2026-11-05T08:00:00-05:00")
+    rows = PersonalImport.new(@user, { "records" => { "weights" => [fresh, repeated, fresh.merge("value" => "201.0")] } }).report
+    assert_equal [1, 1, 1], rows.values_at("creates", "duplicates", "conflicts")
+  end
   test "date only mapping uses explicit format noon and offset" do
     payload = PersonalImport.parse_csv("date,weight\n02/11/2026,94.25\n", { "date_column" => "date", "value_column" => "weight", "unit" => "kg", "date_format" => "dmy", "offset" => "-05:00" })
     assert_empty payload["parse_errors"]

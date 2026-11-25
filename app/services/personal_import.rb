@@ -81,22 +81,23 @@ class PersonalImport
         existing = @user.public_send(kind).find_by(uuid: record.uuid)
         existing ||= @user.day_notes.find_by(local_date: record.local_date) if kind == "day_notes"
         canonical = record.portable
+        content = content_key(record)
         previous = seen[[kind, record.uuid]]
         previous ||= seen_days[record.local_date] if kind == "day_notes"
         status = if existing
-          same_content?(kind, existing.portable, canonical) ? "duplicates" : "conflicts"
+          content_key(existing) == content ? "duplicates" : "conflicts"
         elsif previous
-          same_content?(kind, previous, canonical) ? "duplicates" : "conflicts"
-        elsif existing_content[content_key(record)] || seen_content[[kind, content_key(record)]]
+          previous == content ? "duplicates" : "conflicts"
+        elsif existing_content[content] || seen_content[[kind, content]]
           # The same event saved under another ID, such as a manually logged
           # entry that was also restored from a file.
           "duplicates"
         else
           "creates"
         end
-        seen_content[[kind, content_key(record)]] = true if status == "creates"
-        seen[[kind, record.uuid]] = canonical
-        seen_days[record.local_date] = canonical if kind == "day_notes"
+        seen_content[[kind, content]] = true if status == "creates"
+        seen[[kind, record.uuid]] = content
+        seen_days[record.local_date] = content if kind == "day_notes"
         result[status] += 1
         result["rows"] << { "row" => row_number, "kind" => kind, "status" => status, "data" => canonical }
       end
@@ -130,11 +131,6 @@ class PersonalImport
     when Injection then [record.recorded_at, record.dose, record.site.presence, record.side.presence, record.notes.presence]
     when DayNote then [record.local_date, record.notes.presence, record.metrics]
     end
-  end
-  # A journal date is unique per account, so its ID is not part of its content.
-  def same_content?(kind, left, right)
-    return left == right unless kind == "day_notes"
-    left.except("id", "notes") == right.except("id", "notes") && left["notes"].presence == right["notes"].presence
   end
   def valid_reminder?(value)
     Date.iso8601(value[0, 10])
